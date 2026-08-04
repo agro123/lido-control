@@ -577,7 +577,7 @@ export default function RegistroMensual({
               </label>
               <label className="campo">
                 <span className="campo-etiqueta">Tarifa Energía ($/kWh)</span>
-                <span >{formatearPesos(tarifaEnergia)}</span>
+                <span className="valor-etiqueta"> {formatearPesos(tarifaEnergia)}</span>
               </label>
             </div>
           </div>
@@ -629,7 +629,7 @@ export default function RegistroMensual({
               </label>
               <label className="campo">
                 <span className="campo-etiqueta">Tarifa Agua ($/m³)</span>
-                <span >{formatearPesos(tarifaAgua)}</span>
+                <span className="valor-etiqueta">{formatearPesos(tarifaAgua)}</span>
               </label>
             </div>
           </div>
@@ -653,7 +653,7 @@ export default function RegistroMensual({
               </label>
               <label className="campo">
                 <span className="campo-etiqueta">Tarifa Fija ($)</span>
-                <span >{formatearPesos(tarifaFija)}</span>
+                <span className="valor-etiqueta">{formatearPesos(tarifaFija)}</span>
               </label>
             </div>
           </div>

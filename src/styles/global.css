@@ -785,6 +785,12 @@ button {
   min-width: 180px;
 }
 
+.valor-etiqueta {
+  font-weight: bold;
+  color: var(--color-encabezado);
+  text-align: right;
+}
+
 /* ---------- Accesibilidad: movimiento reducido ---------- */
 
 @media (prefers-reduced-motion: reduce) {
