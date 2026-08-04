@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MESES, ANIOS } from "../helpers/constantes";
-import { calcularFilaApartamento } from "../helpers/calculos";
+import {
+  calcularFilaApartamento,
+  calcularTarifaAgua,
+  calcularTarifaEnergia,
+  calcularTarifaFija,
+} from "../helpers/calculos";
 import { obtenerMesAnioAnterior } from "../helpers/fechas";
 import {
   aNumeroONull,
   formatearConsumo,
   formatearPesos,
+  normalizarInputDecimal,
   normalizarInputNumerico,
 } from "../helpers/formato";
 import {
@@ -58,6 +64,22 @@ function obtenerMesAnioActual() {
   };
 }
 
+function calcularTarifasDesdeRecibo({
+  totalEnergiaRecibo,
+  consumoKwh,
+  costoAlcantarillado,
+  costoAcueducto,
+  consumoM3Agua,
+  serviciosVarios,
+  cantidadApartamentos,
+}) {
+  return {
+    tarifaEnergia: calcularTarifaEnergia(totalEnergiaRecibo, consumoKwh),
+    tarifaAgua: calcularTarifaAgua(costoAlcantarillado, costoAcueducto, consumoM3Agua),
+    tarifaFija: calcularTarifaFija(serviciosVarios, cantidadApartamentos),
+  };
+}
+
 /**
  * Página de registro mensual: ingreso de lecturas y cálculo automático.
  * Diseño compacto pensado para pantallas 1366×768.
@@ -73,6 +95,12 @@ export default function RegistroMensual({
   const [tarifaEnergia, setTarifaEnergia] = useState("");
   const [tarifaAgua, setTarifaAgua] = useState("");
   const [tarifaFija, setTarifaFija] = useState("");
+  const [costoAlcantarillado, setCostoAlcantarillado] = useState("");
+  const [costoAcueducto, setCostoAcueducto] = useState("");
+  const [consumoM3Agua, setConsumoM3Agua] = useState("");
+  const [totalEnergiaRecibo, setTotalEnergiaRecibo] = useState("");
+  const [consumoKwh, setConsumoKwh] = useState("");
+  const [serviciosVarios, setServiciosVarios] = useState("");
   const [filas, setFilas] = useState([]);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState("");
@@ -103,6 +131,29 @@ export default function RegistroMensual({
     });
   }
 
+  function actualizarTarifasDesdeRecibo({
+    totalEnergiaRecibo: nuevoTotalEnergiaRecibo = totalEnergiaRecibo,
+    consumoKwh: nuevoConsumoKwh = consumoKwh,
+    costoAlcantarillado: nuevoCostoAlcantarillado = costoAlcantarillado,
+    costoAcueducto: nuevoCostoAcueducto = costoAcueducto,
+    consumoM3Agua: nuevoConsumoM3Agua = consumoM3Agua,
+    serviciosVarios: nuevosServiciosVarios = serviciosVarios,
+  }) {
+    const tarifas = calcularTarifasDesdeRecibo({
+      totalEnergiaRecibo: nuevoTotalEnergiaRecibo,
+      consumoKwh: nuevoConsumoKwh,
+      costoAlcantarillado: nuevoCostoAlcantarillado,
+      costoAcueducto: nuevoCostoAcueducto,
+      consumoM3Agua: nuevoConsumoM3Agua,
+      serviciosVarios: nuevosServiciosVarios,
+      cantidadApartamentos: apartamentos.length,
+    });
+
+    setTarifaEnergia(tarifas.tarifaEnergia == null ? "" : String(tarifas.tarifaEnergia));
+    setTarifaAgua(tarifas.tarifaAgua == null ? "" : String(tarifas.tarifaAgua));
+    setTarifaFija(tarifas.tarifaFija == null ? "" : String(tarifas.tarifaFija));
+  }
+
   /**
    * Carga tarifas y lecturas para un mes/año concretos.
    * @param {string} mesObjetivo
@@ -123,6 +174,12 @@ export default function RegistroMensual({
       setTarifaEnergia(String(registro.tarifaEnergia ?? ""));
       setTarifaAgua(String(registro.tarifaAgua ?? ""));
       setTarifaFija(String(registro.tarifaFija ?? ""));
+      setCostoAlcantarillado("");
+      setCostoAcueducto("");
+      setConsumoM3Agua("");
+      setTotalEnergiaRecibo("");
+      setConsumoKwh("");
+      setServiciosVarios("");
       setFilas(
         apartamentos.map((apto) => {
           const datosApto = (registro.apartamentos || []).find(
@@ -145,6 +202,12 @@ export default function RegistroMensual({
       setTarifaEnergia("");
       setTarifaAgua("");
       setTarifaFija("");
+      setCostoAlcantarillado("");
+      setCostoAcueducto("");
+      setConsumoM3Agua("");
+      setTotalEnergiaRecibo("");
+      setConsumoKwh("");
+      setServiciosVarios("");
       setFilas(
         apartamentos.map((apto) =>
           crearFilaConMesAnterior(apto.id, mapaAnterior.get(apto.id)),
@@ -404,6 +467,12 @@ export default function RegistroMensual({
     setTarifaEnergia("");
     setTarifaAgua("");
     setTarifaFija("");
+    setCostoAlcantarillado("");
+    setCostoAcueducto("");
+    setConsumoM3Agua("");
+    setTotalEnergiaRecibo("");
+    setConsumoKwh("");
+    setServiciosVarios("");
     setFilas(
       apartamentos.map((apto) =>
         crearFilaConMesAnterior(apto.id, mapaAnterior.get(apto.id)),
@@ -442,7 +511,7 @@ export default function RegistroMensual({
       </header>
 
       <div className="tarjeta tarjeta-compacta">
-        <div className="form-fila form-fila-registro">
+        <div className="form-fila form-fila-registro-periodo">
           <label className="campo">
             <span className="campo-etiqueta">Mes</span>
             <select
@@ -472,37 +541,122 @@ export default function RegistroMensual({
               ))}
             </select>
           </label>
+        </div>
 
-          <label className="campo">
-            <span className="campo-etiqueta">Tarifa Energía ($/kWh)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="input-numero"
-              value={tarifaEnergia}
-              onChange={(e) => setTarifaEnergia(normalizarInputNumerico(e.target.value))}
-            />
-          </label>
-          <label className="campo">
-            <span className="campo-etiqueta">Tarifa Agua ($/m³)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="input-numero"
-              value={tarifaAgua}
-              onChange={(e) => setTarifaAgua(normalizarInputNumerico(e.target.value))}
-            />
-          </label>
-          <label className="campo">
-            <span className="campo-etiqueta">Tarifa Fija ($)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="input-numero"
-              value={tarifaFija}
-              onChange={(e) => setTarifaFija(normalizarInputNumerico(e.target.value))}
-            />
-          </label>
+        <div className="form-fila-registro-grupos">
+          <div className="bloque-tarifa">
+            <h4>Energía</h4>
+            <div className="form-fila form-fila-bloque-tarifa">
+              <label className="campo">
+                <span className="campo-etiqueta">Total energía recibo ($)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={totalEnergiaRecibo}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setTotalEnergiaRecibo(valor);
+                    actualizarTarifasDesdeRecibo({ totalEnergiaRecibo: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Consumo energía total (kWh)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={consumoKwh}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setConsumoKwh(valor);
+                    actualizarTarifasDesdeRecibo({ consumoKwh: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Tarifa Energía ($/kWh)</span>
+                <span >{formatearPesos(tarifaEnergia)}</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="bloque-tarifa">
+            <h4>Agua</h4>
+            <div className="form-fila form-fila-bloque-tarifa">
+              <label className="campo">
+                <span className="campo-etiqueta">Costo alcantarillado ($)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={costoAlcantarillado}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setCostoAlcantarillado(valor);
+                    actualizarTarifasDesdeRecibo({ costoAlcantarillado: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Costo acueducto ($)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={costoAcueducto}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setCostoAcueducto(valor);
+                    actualizarTarifasDesdeRecibo({ costoAcueducto: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Consumo agua total (m³)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={consumoM3Agua}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setConsumoM3Agua(valor);
+                    actualizarTarifasDesdeRecibo({ consumoM3Agua: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Tarifa Agua ($/m³)</span>
+                <span >{formatearPesos(tarifaAgua)}</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="bloque-tarifa">
+            <h4>Fijo</h4>
+            <div className="form-fila form-fila-bloque-tarifa">
+              <label className="campo">
+                <span className="campo-etiqueta">Servicios varios ($)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-numero"
+                  value={serviciosVarios}
+                  onChange={(e) => {
+                    const valor = normalizarInputDecimal(e.target.value);
+                    setServiciosVarios(valor);
+                    actualizarTarifasDesdeRecibo({ serviciosVarios: valor });
+                  }}
+                />
+              </label>
+              <label className="campo">
+                <span className="campo-etiqueta">Tarifa Fija ($)</span>
+                <span >{formatearPesos(tarifaFija)}</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <p className="aviso-tarifas aviso-tarifas-inline" role="status">

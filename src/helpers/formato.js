@@ -39,6 +39,23 @@ export function normalizarInputNumerico(texto) {
 }
 
 /**
+ * Convierte un string de input a número decimal o cadena vacía.
+ * @param {string} texto
+ * @returns {string}
+ */
+export function normalizarInputDecimal(texto) {
+  if (texto === "" || texto === null || texto === undefined) {
+    return "";
+  }
+  const limpio = String(texto).replace(/,/g, ".").replace(/[^\d.]/g, "");
+  const partes = limpio.split(".");
+  if (partes.length > 2) {
+    return `${partes[0]}.${partes.slice(1).join("")}`;
+  }
+  return limpio;
+}
+
+/**
  * Convierte un valor de input a número; retorna null si está vacío.
  * @param {string|number} valor
  * @returns {number|null}

@@ -43,6 +43,52 @@ export function calcularCosto(consumo, tarifa) {
 }
 
 /**
+ * Calcula la tarifa de agua a partir de los valores del recibo.
+ * @param {number|string} costoAlcantarillado
+ * @param {number|string} costoAcueducto
+ * @param {number|string} totalM3Consumidos
+ * @returns {number|null}
+ */
+export function calcularTarifaAgua(costoAlcantarillado, costoAcueducto, totalM3Consumidos) {
+  const total = Number(costoAlcantarillado) + Number(costoAcueducto);
+  const totalM3 = Number(totalM3Consumidos);
+  if (!Number.isFinite(total) || !Number.isFinite(totalM3) || totalM3 === 0) {
+    return null;
+  }
+  return total / totalM3;
+}
+
+/**
+ * Calcula la tarifa de energía a partir del total del recibo y el total de kWh consumidos.
+ * @param {number|string} totalEnergiaRecibo
+ * @param {number|string} totalKwhConsumidos
+ * @returns {number|null}
+ */
+export function calcularTarifaEnergia(totalEnergiaRecibo, totalKwhConsumidos) {
+  const total = Number(totalEnergiaRecibo);
+  const totalKwh = Number(totalKwhConsumidos);
+  if (!Number.isFinite(total) || !Number.isFinite(totalKwh) || totalKwh === 0) {
+    return null;
+  }
+  return total / totalKwh;
+}
+
+/**
+ * Calcula la tarifa fija a partir de los servicios varios y la cantidad de apartamentos.
+ * @param {number|string} serviciosVarios
+ * @param {number|string} cantidadApartamentos
+ * @returns {number|null}
+ */
+export function calcularTarifaFija(serviciosVarios, cantidadApartamentos) {
+  const totalServicios = Number(serviciosVarios);
+  const cantidad = Number(cantidadApartamentos);
+  if (!Number.isFinite(totalServicios) || !Number.isFinite(cantidad) || cantidad === 0) {
+    return null;
+  }
+  return totalServicios / cantidad;
+}
+
+/**
  * Total a pagar = costo energía + costo agua + tarifa fija.
  * @param {number|null} costoEnergia
  * @param {number|null} costoAgua

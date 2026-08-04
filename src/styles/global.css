@@ -241,7 +241,7 @@ button {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 12px 14px;
+  padding: 10px 14px;
   overflow: auto;
 }
 
@@ -302,13 +302,13 @@ button {
 }
 
 .tarjeta-compacta {
-  padding: 10px 12px;
+  padding: 8px 12px;
   margin-bottom: 0;
   flex-shrink: 0;
 }
 
 .tarjeta-tabla {
-  padding: 8px;
+  padding: 1px;
   margin-bottom: 0;
   flex: 1;
   min-height: 0;
@@ -341,6 +341,39 @@ button {
   grid-template-columns: 140px 110px repeat(3, minmax(130px, 1fr));
   gap: 10px;
   align-items: end;
+}
+
+.form-fila-registro-periodo {
+  display: grid;
+  grid-template-columns: 140px 110px;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 6px;
+}
+
+.form-fila-registro-grupos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.form-fila-bloque-tarifa {
+  display: grid;
+  gap: 8px;
+}
+
+.bloque-tarifa {
+  background: #f7fbff;
+  border: 1px solid #dfe7f0;
+  border-radius: 10px;
+  padding: 5px;
+}
+
+.bloque-tarifa h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--color-encabezado);
 }
 
 .form-fila-filtros {
@@ -413,7 +446,7 @@ button {
 }
 
 .aviso-tarifas-inline {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   padding: 6px 10px;
 }
 
@@ -671,7 +704,7 @@ button {
   background: #e8eef5;
   font-weight: 700;
   font-size: 13px;
-  padding: 6px 3px;
+  padding: 4px 3px;
 }
 
 .tabla-registro .fila-totales .col-energia {
@@ -769,6 +802,10 @@ button {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
 
+  .form-fila-registro-grupos {
+    grid-template-columns: 1fr;
+  }
+
   .pagina-encabezado-compacto {
     flex-direction: column;
     align-items: stretch;
@@ -827,6 +864,7 @@ button {
   .form-fila-2,
   .form-fila-3,
   .form-fila-registro,
+  .form-fila-registro-periodo,
   .form-fila-filtros,
   .form-agregar {
     grid-template-columns: 1fr;
