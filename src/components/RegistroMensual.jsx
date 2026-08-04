@@ -16,6 +16,7 @@ import {
 } from "../helpers/formato";
 import {
   CAMPOS_EDITABLES_REGISTRO,
+  navegarCamposConFlechas,
   navegarCeldasConFlechas,
 } from "../helpers/navegacionTabla";
 
@@ -108,6 +109,7 @@ export default function RegistroMensual({
   const [guardando, setGuardando] = useState(false);
   const [origenMesAnterior, setOrigenMesAnterior] = useState(null);
   const tablaRef = useRef(null);
+  const camposReciboRef = useRef(null);
   const formularioInicializado = useRef(false);
   const mesRef = useRef(mes);
   const anioRef = useRef(anio);
@@ -128,6 +130,12 @@ export default function RegistroMensual({
       columna: indiceColumna,
       totalFilas: filas.length,
       totalColumnas: CAMPOS_EDITABLES_REGISTRO.length,
+    });
+  }
+
+  function manejarTeclaCampoSuperior(evento) {
+    navegarCamposConFlechas(evento, {
+      contenedor: camposReciboRef.current,
     });
   }
 
@@ -510,12 +518,14 @@ export default function RegistroMensual({
         </div>
       </header>
 
-      <div className="tarjeta tarjeta-compacta">
+      <div className="tarjeta tarjeta-compacta" ref={camposReciboRef}>
         <div className="form-fila form-fila-registro-periodo">
           <label className="campo">
             <span className="campo-etiqueta">Mes</span>
             <select
               value={mes}
+              data-navegacion-campo="true"
+              onKeyDown={manejarTeclaCampoSuperior}
               onChange={(e) => cambiarMes(e.target.value)}
               aria-invalid={Boolean(errores.mes)}
             >
@@ -531,6 +541,8 @@ export default function RegistroMensual({
             <span className="campo-etiqueta">Año</span>
             <select
               value={anio}
+              data-navegacion-campo="true"
+              onKeyDown={manejarTeclaCampoSuperior}
               onChange={(e) => cambiarAnio(e.target.value)}
               aria-invalid={Boolean(errores.anio)}
             >
@@ -553,7 +565,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={totalEnergiaRecibo}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setTotalEnergiaRecibo(valor);
@@ -567,7 +581,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={consumoKwh}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setConsumoKwh(valor);
@@ -591,7 +607,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={costoAlcantarillado}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setCostoAlcantarillado(valor);
@@ -605,7 +623,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={costoAcueducto}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setCostoAcueducto(valor);
@@ -619,7 +639,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={consumoM3Agua}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setConsumoM3Agua(valor);
@@ -643,7 +665,9 @@ export default function RegistroMensual({
                   type="text"
                   inputMode="decimal"
                   className="input-numero"
+                  data-navegacion-campo="true"
                   value={serviciosVarios}
+                  onKeyDown={manejarTeclaCampoSuperior}
                   onChange={(e) => {
                     const valor = normalizarInputDecimal(e.target.value);
                     setServiciosVarios(valor);

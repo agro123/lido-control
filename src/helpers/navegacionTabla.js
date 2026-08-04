@@ -109,3 +109,53 @@ export function navegarCeldasConFlechas(evento, opciones) {
   evento.preventDefault();
   enfocarCelda(contenedor, nuevaFila, nuevaColumna);
 }
+
+/**
+ * Navegación tipo Excel entre campos de entrada del formulario superior.
+ * Usa el orden DOM de los campos para moverse con flechas.
+ * @param {KeyboardEvent} evento
+ * @param {{ contenedor: HTMLElement | null }} opciones
+ */
+export function navegarCamposConFlechas(evento, opciones) {
+  const { contenedor } = opciones;
+  const tecla = evento.key;
+
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(tecla)) {
+    return;
+  }
+
+  const control = evento.currentTarget;
+  if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  const campos = Array.from(
+    contenedor?.querySelectorAll('[data-navegacion-campo="true"]') ?? [],
+  );
+  const indiceActual = campos.indexOf(control);
+
+  if (indiceActual < 0) {
+    return;
+  }
+
+  let indiceDestino = indiceActual;
+
+  if (tecla === "ArrowLeft" || tecla === "ArrowUp") {
+    indiceDestino = Math.max(0, indiceActual - 1);
+  } else if (tecla === "ArrowRight" || tecla === "ArrowDown" || tecla === "Enter") {
+    indiceDestino = Math.min(campos.length - 1, indiceActual + 1);
+  }
+
+  if (indiceDestino === indiceActual) {
+    return;
+  }
+
+  evento.preventDefault();
+  const destino = campos[indiceDestino];
+  if (destino instanceof HTMLInputElement) {
+    destino.focus();
+    destino.select();
+  } else if (destino instanceof HTMLSelectElement) {
+    destino.focus();
+  }
+}
