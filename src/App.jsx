@@ -60,6 +60,7 @@ function App() {
             registros={datos.registros}
             apartamentos={datos.apartamentos}
             eliminarRegistro={eliminarRegistro}
+            guardarRegistro={guardarRegistro}
           />
         )}
 

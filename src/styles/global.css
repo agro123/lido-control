@@ -798,6 +798,271 @@ button {
   font-weight: 700;
 }
 
+/* ---------- Historial en formato de directorio ---------- */
+
+.pagina-historial {
+  overflow: auto;
+}
+
+.tarjeta-historial-grid {
+  min-height: 210px;
+}
+
+.historial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.historial-total {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0 0 auto;
+  padding: 10px 14px;
+  border: 1px solid #b7c6d6;
+  border-radius: 8px;
+  background: #f7fafc;
+  color: var(--color-encabezado);
+}
+
+.historial-total span {
+  color: var(--color-texto-secundario);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.historial-total strong {
+  font-size: 18px;
+}
+
+.historial-vacio {
+  margin: 0;
+  padding: 30px 12px;
+  color: var(--color-texto-secundario);
+  text-align: center;
+}
+
+.archivo-registro {
+  position: relative;
+  min-width: 0;
+}
+
+.archivo-registro-principal {
+  display: flex;
+  width: 100%;
+  min-height: 156px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 14px 28px 12px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: center;
+}
+
+.archivo-registro-principal:hover,
+.archivo-registro-principal:focus-visible {
+  border-color: #7ba4cc;
+  background: #eaf3fc;
+  outline: none;
+}
+
+.archivo-icono {
+  font-size: 54px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+
+.archivo-nombre {
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.archivo-meta {
+  color: var(--color-texto-secundario);
+  font-size: 12px;
+}
+
+.archivo-eliminar {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #d49a9a;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--color-peligro);
+  font-size: 15px;
+}
+
+.archivo-eliminar:hover,
+.archivo-eliminar:focus-visible {
+  background: #fdecea;
+  outline: 2px solid var(--color-peligro);
+  outline-offset: 1px;
+}
+
+/* ---------- Modales ---------- */
+
+.modal-fondo {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 32, 46, 0.5);
+}
+
+.modal {
+  width: min(100%, 1100px);
+  max-height: min(88dvh, 800px);
+  overflow: auto;
+  border: 1px solid #9fb7cf;
+  border-radius: 10px;
+  background: var(--color-superficie);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+
+.modal-confirmacion {
+  width: min(100%, 460px);
+  padding: 20px;
+}
+
+.modal-confirmacion h3,
+.modal-registro h3,
+.modal-contenido h4 {
+  margin: 0;
+  color: var(--color-encabezado);
+}
+
+.modal-confirmacion p {
+  margin: 12px 0 18px;
+}
+
+.modal-encabezado,
+.modal-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.modal-encabezado {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  border-bottom: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+}
+
+.modal-encabezado p {
+  margin: 3px 0 0;
+  color: var(--color-texto-secundario);
+  font-size: 13px;
+}
+
+.modal-cerrar {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-borde);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--color-texto);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.modal-contenido {
+  padding: 16px 18px;
+}
+
+.modal-contenido h4 {
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.modal-contenido h4:not(:first-child) {
+  margin-top: 18px;
+}
+
+.detalle-recibo-grid,
+.detalle-tarifas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.detalle-tarifas {
+  margin-top: 10px;
+}
+
+.campo-detalle {
+  padding: 7px;
+  border: 1px solid #d7e0ea;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.valor-detalle {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  font-weight: 700;
+  color: var(--color-encabezado);
+}
+
+.tabla-detalle {
+  min-width: 920px;
+}
+
+.tabla-detalle .fila-totales td {
+  background: #e8eef5;
+  font-weight: 700;
+}
+
+.tabla-detalle .fila-totales td:first-child {
+  text-align: right;
+  color: var(--color-encabezado);
+}
+
+.tabla-detalle .fila-totales .celda-total-pagado {
+  background: var(--color-total-fondo) !important;
+  color: var(--color-total-texto) !important;
+}
+
+.modal-registro .modal-acciones {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+}
+
+@media (max-width: 700px) {
+  .modal-fondo {
+    padding: 8px;
+  }
+
+  .detalle-recibo-grid,
+  .detalle-tarifas {
+    grid-template-columns: 1fr;
+  }
+
+  .archivo-registro-principal {
+    min-height: 136px;
+  }
+}
+
 /* ---------- Config apartamentos ---------- */
 
 .lista-apartamentos {

@@ -191,12 +191,12 @@ export default function RegistroMensual({
       setTarifaEnergia(String(registro.tarifaEnergia ?? ""));
       setTarifaAgua(String(registro.tarifaAgua ?? ""));
       setTarifaFija(String(registro.tarifaFija ?? ""));
-      setCostoAlcantarillado("");
-      setCostoAcueducto("");
-      setConsumoM3Agua("");
-      setTotalEnergiaRecibo("");
-      setConsumoKwh("");
-      setServiciosVarios("");
+      setCostoAlcantarillado(String(registro.recibo?.costoAlcantarillado ?? ""));
+      setCostoAcueducto(String(registro.recibo?.costoAcueducto ?? ""));
+      setConsumoM3Agua(String(registro.recibo?.consumoM3Agua ?? ""));
+      setTotalEnergiaRecibo(String(registro.recibo?.totalEnergia ?? ""));
+      setConsumoKwh(String(registro.recibo?.consumoKwh ?? ""));
+      setServiciosVarios(String(registro.recibo?.serviciosVarios ?? ""));
       setFilas(
         apartamentos.map((apto) => {
           const datosApto = (registro.apartamentos || []).find(
@@ -410,6 +410,14 @@ export default function RegistroMensual({
       tarifaEnergia: aNumeroONull(tarifaEnergia) ?? 0,
       tarifaAgua: aNumeroONull(tarifaAgua) ?? 0,
       tarifaFija: aNumeroONull(tarifaFija) ?? 0,
+      recibo: {
+        totalEnergia: aNumeroONull(totalEnergiaRecibo),
+        consumoKwh: aNumeroONull(consumoKwh),
+        costoAlcantarillado: aNumeroONull(costoAlcantarillado),
+        costoAcueducto: aNumeroONull(costoAcueducto),
+        consumoM3Agua: aNumeroONull(consumoM3Agua),
+        serviciosVarios: aNumeroONull(serviciosVarios),
+      },
       apartamentos: filasCalculadas.map((fila) => ({
         apartamentoId: fila.apartamentoId,
         energia: {

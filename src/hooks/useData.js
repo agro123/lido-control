@@ -28,7 +28,15 @@ function normalizarDatos(raw) {
       )
     : [...DATOS_VACIOS.apartamentos];
 
-  const registros = Array.isArray(raw.registros) ? raw.registros : [];
+  const registros = Array.isArray(raw.registros)
+    ? raw.registros.map((registro, indice) => ({
+        ...registro,
+        id:
+          typeof registro?.id === "string" && registro.id
+            ? registro.id
+            : `registro-legado-${registro?.mes || "sin-mes"}-${registro?.anio || "sin-anio"}-${indice}`,
+      }))
+    : [];
 
   return {
     apartamentos: apartamentos.length > 0 ? apartamentos : [...DATOS_VACIOS.apartamentos],
@@ -102,16 +110,21 @@ export function useData() {
     async (registro, sobrescribir = false) => {
       if (!datos) return { ok: false, existe: false };
 
+      const indicePorId = registro.id
+        ? datos.registros.findIndex((r) => r.id === registro.id)
+        : -1;
       const indiceExistente = datos.registros.findIndex(
         (r) => r.mes === registro.mes && r.anio === registro.anio,
       );
 
-      if (indiceExistente >= 0 && !sobrescribir) {
+      if (indicePorId < 0 && indiceExistente >= 0 && !sobrescribir) {
         return { ok: false, existe: true };
       }
 
       const registros = [...datos.registros];
-      if (indiceExistente >= 0) {
+      if (indicePorId >= 0) {
+        registros[indicePorId] = registro;
+      } else if (indiceExistente >= 0) {
         registros[indiceExistente] = registro;
       } else {
         registros.push(registro);
@@ -124,14 +137,13 @@ export function useData() {
   );
 
   /**
-   * Elimina un registro completo (todos los apartamentos de un mes/año).
-   * @param {string} mes
-   * @param {number} anio
+   * Elimina un registro completo por su identificador.
+   * @param {string} registroId
    */
   const eliminarRegistro = useCallback(
-    async (mes, anio) => {
+    async (registroId) => {
       if (!datos) return false;
-      const registros = datos.registros.filter((r) => !(r.mes === mes && r.anio === anio));
+      const registros = datos.registros.filter((r) => r.id !== registroId);
       return guardarDatos({ ...datos, registros });
     },
     [datos, guardarDatos],
