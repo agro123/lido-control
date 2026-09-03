@@ -760,8 +760,8 @@ button {
 .tabla-registro .fila-totales td {
   background: #e8eef5;
   font-weight: 700;
-  font-size: 11px;
-  padding: 3px 2px;
+  font-size: 12px;
+  padding: 9px 3px;
 }
 
 .tabla-registro .fila-totales .col-energia {
@@ -812,9 +812,9 @@ button {
   display: grid;
   width: 100%;
   max-width: 960px;
-  grid-template-rows: repeat(4, minmax(156px, auto));
-  grid-auto-flow: column;
-  grid-auto-columns: 180px;
+  grid-template-columns: repeat(4, 180px);
+  grid-auto-flow: row;
+  grid-auto-rows: minmax(156px, auto);
   justify-content: start;
   gap: 12px;
   overflow-x: auto;
@@ -917,6 +917,22 @@ button {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
 }
 
+.modal-registro {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-registro .modal-encabezado,
+.modal-registro .modal-acciones {
+  flex-shrink: 0;
+}
+
+.modal-registro .modal-contenido {
+  min-height: 0;
+  overflow: auto;
+}
+
 .modal-confirmacion {
   width: min(100%, 460px);
   padding: 20px;
@@ -981,7 +997,8 @@ button {
 }
 
 .detalle-recibo-grid,
-.detalle-tarifas {
+.detalle-tarifas,
+.detalle-recibo-grupos {
   display: grid;
   grid-template-columns: repeat(3, minmax(160px, 1fr));
   gap: 8px;
@@ -1153,8 +1170,7 @@ button {
 }
 
 .modal-registro .modal-acciones {
-  position: sticky;
-  bottom: 0;
+  position: static;
   border-top: 1px solid var(--color-borde);
   background: var(--color-superficie);
 }
@@ -1165,7 +1181,8 @@ button {
   }
 
   .detalle-recibo-grid,
-  .detalle-tarifas {
+  .detalle-tarifas,
+  .detalle-recibo-grupos {
     grid-template-columns: 1fr;
   }
 
@@ -1174,7 +1191,8 @@ button {
   }
 
   .historial-grid {
-    grid-template-rows: repeat(3, minmax(136px, auto));
+    grid-template-columns: repeat(2, 160px);
+    grid-auto-rows: minmax(136px, auto);
   }
 
   .comparacion-total {

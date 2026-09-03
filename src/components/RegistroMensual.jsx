@@ -176,8 +176,8 @@ export default function RegistroMensual({
    * @param {string} mesObjetivo
    * @param {number} anioObjetivo
    */
-  function cargarFormulario(mesObjetivo, anioObjetivo) {
-    const registro = buscarRegistro(mesObjetivo, anioObjetivo);
+  function cargarFormulario(mesObjetivo, anioObjetivo, soloLecturasIniciales = false) {
+    const registro = soloLecturasIniciales ? null : buscarRegistro(mesObjetivo, anioObjetivo);
     const anteriorRef = obtenerMesAnioAnterior(mesObjetivo, anioObjetivo);
     const registroAnterior = anteriorRef
       ? buscarRegistro(anteriorRef.mes, anteriorRef.anio)
@@ -243,14 +243,15 @@ export default function RegistroMensual({
   }
 
   /**
-   * Carga inicial al montar. Al cambiar mes/año NO se recargan los valores:
+   * Carga inicial al montar. Solo muestra lecturas anteriores en las columnas
+   * "Ant."; los demás campos empiezan vacíos. Al cambiar mes/año NO se recargan los valores:
    * se conservan para que el usuario pueda corregir el periodo antes de guardar.
    * Solo se sincronizan filas si cambia la lista de apartamentos.
    */
   useEffect(() => {
     if (!formularioInicializado.current) {
       formularioInicializado.current = true;
-      cargarFormulario(mesRef.current, anioRef.current);
+      cargarFormulario(mesRef.current, anioRef.current, true);
       return;
     }
 
@@ -634,8 +635,8 @@ export default function RegistroMensual({
           <div className="bloque-tarifa">
             <h4>Agua</h4>
             <div className="form-fila form-fila-bloque-tarifa">
-              <label className="campo tooltip" data-tooltip="Costo de alcantarillado del recibo de agua del periodo." title="Costo de alcantarillado del recibo de agua del periodo.">
-                <span className="campo-etiqueta">Costo alcantarillado ($)</span>
+            <label className="campo tooltip" data-tooltip="Valor total de alcantarillado del recibo de agua del periodo." title="Valor total de alcantarillado del recibo de agua del periodo.">
+                <span className="campo-etiqueta">Total alcantarillado recibo ($)</span>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -650,8 +651,8 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo tooltip" data-tooltip="Costo de acueducto del recibo de agua del periodo." title="Costo de acueducto del recibo de agua del periodo.">
-                <span className="campo-etiqueta">Costo acueducto ($)</span>
+              <label className="campo tooltip" data-tooltip="Valor total de acueducto del recibo de agua del periodo." title="Valor total de acueducto del recibo de agua del periodo.">
+                <span className="campo-etiqueta">Total acueducto recibo ($)</span>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -692,7 +693,7 @@ export default function RegistroMensual({
           <div className="bloque-tarifa">
             <h4>Fijo</h4>
             <div className="form-fila form-fila-bloque-tarifa">
-              <label className="campo tooltip" data-tooltip="Valor de servicios varios del recibo del periodo." title="Valor de servicios varios del recibo del periodo.">
+              <label className="campo tooltip" data-tooltip="Corresponde a SubTotal Otros servicios de la factura" title="Corresponde a SubTotal Otros servicios de la factura">
                 <span className="campo-etiqueta">Servicios varios ($)</span>
                 <input
                   type="text"

@@ -19,16 +19,22 @@ import {
 const CAMPOS_RECIBO = [
   ["totalEnergia", "Total energía recibo ($)", "Valor total facturado por energía."],
   ["consumoKwh", "Consumo energía total (kWh)", "Consumo total indicado en el recibo de energía."],
-  ["costoAlcantarillado", "Costo alcantarillado ($)", "Valor facturado por alcantarillado."],
-  ["costoAcueducto", "Costo acueducto ($)", "Valor facturado por acueducto."],
+  ["costoAlcantarillado", "Total alcantarillado recibo ($)", "Valor total facturado por alcantarillado."],
+  ["costoAcueducto", "Total acueducto recibo ($)", "Valor total facturado por acueducto."],
   ["consumoM3Agua", "Consumo agua total (m³)", "Consumo total indicado en el recibo de agua."],
-  ["serviciosVarios", "Servicios varios ($)", "Valor total de servicios varios."],
+  ["serviciosVarios", "Servicios varios ($)", "Corresponde a SubTotal Otros servicios de la factura"],
 ];
 
 const CAMPOS_TARIFA = [
   ["tarifaEnergia", "Tarifa energía ($/kWh)"],
   ["tarifaAgua", "Tarifa agua ($/m³)"],
   ["tarifaFija", "Tarifa fija por apartamento ($)"],
+];
+
+const GRUPOS_DATOS_RECIBO = [
+  ["Energía", [["recibo", "totalEnergia"], ["recibo", "consumoKwh"], ["tarifa", "tarifaEnergia"]]],
+  ["Agua", [["recibo", "costoAlcantarillado"], ["recibo", "costoAcueducto"], ["recibo", "consumoM3Agua"], ["tarifa", "tarifaAgua"]]],
+  ["Fijo", [["recibo", "serviciosVarios"], ["tarifa", "tarifaFija"]]],
 ];
 
 function estaFaltante(valor) {
@@ -65,8 +71,8 @@ function aplanarRegistros(registros, apartamentos) {
       Apartamento: nombres.get(apto.apartamentoId) || `Apartamento ${apto.apartamentoId}`,
       "Total energía recibo ($)": registro.recibo?.totalEnergia,
       "Consumo energía total (kWh)": registro.recibo?.consumoKwh,
-      "Costo alcantarillado ($)": registro.recibo?.costoAlcantarillado,
-      "Costo acueducto ($)": registro.recibo?.costoAcueducto,
+      "Total alcantarillado recibo ($)": registro.recibo?.costoAlcantarillado,
+      "Total acueducto recibo ($)": registro.recibo?.costoAcueducto,
       "Consumo agua total (m³)": registro.recibo?.consumoM3Agua,
       "Servicios varios ($)": registro.recibo?.serviciosVarios,
       "Lect. Ant. Energía": apto.energia?.lecturaAnterior,
@@ -141,6 +147,18 @@ function textoVariacion(porcentaje) {
   if (porcentaje === null) return null;
   const signo = porcentaje > 0 ? "+" : "";
   return `${signo}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(porcentaje)}%`;
+}
+
+function tieneDatosFaltantes(registro) {
+  if (!registro) return false;
+  if (CAMPOS_RECIBO.some(([campo]) => estaFaltante(registro.recibo?.[campo]))) return true;
+  if (CAMPOS_TARIFA.some(([campo]) => estaFaltante(registro[campo]))) return true;
+  return (registro.apartamentos || []).some((apartamento) => (
+    estaFaltante(apartamento.energia?.lecturaAnterior)
+    || estaFaltante(apartamento.energia?.lecturaActual)
+    || estaFaltante(apartamento.agua?.lecturaAnterior)
+    || estaFaltante(apartamento.agua?.lecturaActual)
+  ));
 }
 
 export default function Historial({ registros, apartamentos, eliminarRegistro, guardarRegistro }) {
@@ -233,13 +251,12 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
     setMensaje(ok ? `Registro de ${registro.mes} ${registro.anio} eliminado.` : "No se pudo eliminar el registro.");
   }
 
-  function exportarExcel() {
-    const filas = aplanarRegistros(registrosFiltrados, apartamentos);
-    if (!filas.length) return window.alert("No hay datos para exportar con los filtros actuales.");
+  function exportarRegistro(registro) {
+    const filas = aplanarRegistros([registro], apartamentos);
+    if (!filas.length) return window.alert("Este registro no tiene datos para exportar.");
     const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Historial");
-    XLSX.writeFile(libro, `historial-consumo-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    setMensaje("Archivo Excel exportado correctamente.");
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Registro");
+    XLSX.writeFile(libro, `registro-${registro.mes.toLowerCase()}-${registro.anio}.xlsx`);
   }
 
   return <section className="pagina pagina-historial">
@@ -250,22 +267,31 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
       <label className="campo"><span className="campo-etiqueta">Apartamento</span><select value={filtroApto} onChange={(e) => setFiltroApto(e.target.value)}><option value="">Todos</option>{apartamentos.map((apto) => <option key={apto.id} value={apto.id}>{apto.nombre}</option>)}</select></label>
       <div className="campo campo-accion"><span className="campo-etiqueta campo-etiqueta-invisible">Acciones</span><button type="button" className="btn btn-secundario" onClick={() => { setFiltroMes(""); setFiltroAnio(""); setFiltroApto(""); }}>Limpiar filtros</button></div>
     </div></div>
-    <div className="acciones acciones-arriba"><button type="button" className="btn btn-primario" onClick={exportarExcel}>Exportar a Excel (.xlsx)</button></div>
     {mensaje && <p className="mensaje-exito" role="status">{mensaje}</p>}
     <div className="tarjeta tarjeta-historial-grid">{registrosFiltrados.length === 0 ? <p className="historial-vacio">No hay registros para mostrar.</p> : <div className="historial-grid">{registrosFiltrados.map((registro) => <article key={registro.id} className="archivo-registro"><button type="button" className="archivo-registro-principal" onClick={() => abrirDetalle(registro)} aria-label={`Abrir ${registro.mes} ${registro.anio}, copia ${registro.copia}`}><span className="archivo-icono" aria-hidden="true">📁</span><span className="archivo-nombre">{registro.mes} {registro.anio} - Copia {String(registro.copia).padStart(2, "0")}</span><span className="archivo-meta">{(registro.apartamentos || []).length} apartamento(s)</span></button><button type="button" className="archivo-eliminar" onClick={() => setRegistroAEliminar(registro)} title="Eliminar este registro" aria-label={`Eliminar ${registro.mes} ${registro.anio}`}>🗑</button></article>)}</div>}</div>
-    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} registros={registros} apartamentos={apartamentos} guardando={guardandoDetalle} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} />}
+    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} registros={registros} apartamentos={apartamentos} guardando={guardandoDetalle} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} onExportar={() => exportarRegistro(registroDetalle)} />}
     {registroAEliminar && <div className="modal-fondo" role="presentation"><section className="modal modal-confirmacion" role="dialog" aria-modal="true" aria-labelledby="eliminar-titulo"><h3 id="eliminar-titulo">¿Eliminar registro?</h3><p>Se eliminará únicamente <strong>{registroAEliminar.mes} {registroAEliminar.anio} - Copia {String(registroAEliminar.copia).padStart(2, "0")}</strong>, junto con los datos de sus apartamentos.</p><div className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={() => setRegistroAEliminar(null)}>Cancelar</button><button type="button" className="btn btn-peligro" onClick={confirmarEliminacion}>Eliminar registro</button></div></section></div>}
   </section>;
 }
 
-function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar }) {
+function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar, onExportar }) {
   const totalAPagar = calcularTotalRegistro(borrador);
   const registroAnterior = useMemo(() => buscarRegistroAnterior(registro, registros), [registro, registros]);
   const totalAnterior = registroAnterior ? calcularTotalRegistro(registroAnterior) : null;
   const variacionTotal = calcularVariacionPorcentual(totalAPagar, totalAnterior);
   const periodoAnterior = registroAnterior ? `${registroAnterior.mes} ${registroAnterior.anio}` : null;
+  const puedeCompletar = tieneDatosFaltantes(registro);
 
-  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grid">{CAMPOS_RECIBO.map(([campo, etiqueta, ayuda]) => <CampoDetalle key={campo} etiqueta={etiqueta} ayuda={ayuda} valor={borrador.recibo?.[campo]} valorAnterior={registroAnterior?.recibo?.[campo]} periodoAnterior={periodoAnterior} editable={estaFaltante(registro.recibo?.[campo])} onChange={(valor) => onActualizarRecibo(campo, valor)} moneda={!campo.includes("consumo")} />)}</div><div className="detalle-tarifas">{CAMPOS_TARIFA.map(([campo, etiqueta]) => <CampoDetalle key={campo} etiqueta={etiqueta} valor={borrador[campo]} valorAnterior={registroAnterior?.[campo]} periodoAnterior={periodoAnterior} editable={estaFaltante(registro[campo])} onChange={(valor) => onActualizarTarifa(campo, valor)} moneda />)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={9}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button><button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button></footer></section></div>;
+  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grupos">{GRUPOS_DATOS_RECIBO.map(([grupo, campos]) => <div className="bloque-tarifa" key={grupo}><h4>{grupo}</h4><div className="form-fila form-fila-bloque-tarifa">{campos.map(([tipo, campo]) => <CampoReciboDetalle key={`${tipo}-${campo}`} tipo={tipo} campo={campo} borrador={borrador} registro={registro} registroAnterior={registroAnterior} periodoAnterior={periodoAnterior} onActualizarRecibo={onActualizarRecibo} onActualizarTarifa={onActualizarTarifa} />)}</div></div>)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={9}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onExportar}>Exportar a Excel (.xlsx)</button><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button>{puedeCompletar && <button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button>}</footer></section></div>;
+}
+
+function CampoReciboDetalle({ tipo, campo, borrador, registro, registroAnterior, periodoAnterior, onActualizarRecibo, onActualizarTarifa }) {
+  const definiciones = tipo === "recibo" ? CAMPOS_RECIBO : CAMPOS_TARIFA;
+  const [, etiqueta, ayuda] = definiciones.find(([nombre]) => nombre === campo);
+  const valor = tipo === "recibo" ? borrador.recibo?.[campo] : borrador[campo];
+  const valorAnterior = tipo === "recibo" ? registroAnterior?.recibo?.[campo] : registroAnterior?.[campo];
+  const editable = tipo === "recibo" ? estaFaltante(registro.recibo?.[campo]) : estaFaltante(registro[campo]);
+  return <CampoDetalle etiqueta={etiqueta} ayuda={ayuda} valor={valor} valorAnterior={valorAnterior} periodoAnterior={periodoAnterior} editable={editable} onChange={(valorNuevo) => tipo === "recibo" ? onActualizarRecibo(campo, valorNuevo) : onActualizarTarifa(campo, valorNuevo)} moneda={tipo === "tarifa" || !campo.includes("consumo")} />;
 }
 
 function CampoDetalle({ etiqueta, ayuda, valor, valorAnterior, periodoAnterior, editable, onChange, moneda }) {
@@ -277,12 +303,13 @@ function CampoDetalle({ etiqueta, ayuda, valor, valorAnterior, periodoAnterior, 
 function FilaDetalle({ apartamento, nombre, original, anterior, tarifas, tarifasAnteriores, periodoAnterior, onChange }) {
   const calculos = calcularFilaApartamento({ lecturaAnteriorEnergia: apartamento.energia?.lecturaAnterior, lecturaActualEnergia: apartamento.energia?.lecturaActual, lecturaAnteriorAgua: apartamento.agua?.lecturaAnterior, lecturaActualAgua: apartamento.agua?.lecturaActual }, tarifas);
   const calculosAnteriores = anterior ? calcularFilaApartamento({ lecturaAnteriorEnergia: anterior.energia?.lecturaAnterior, lecturaActualEnergia: anterior.energia?.lecturaActual, lecturaAnteriorAgua: anterior.agua?.lecturaAnterior, lecturaActualAgua: anterior.agua?.lecturaActual }, tarifasAnteriores || {}) : {};
-  const lectura = (servicio, campo, etiqueta) => {
+  const lectura = (servicio, campo, etiqueta, comparar = true) => {
     const contenido = estaFaltante(original[servicio]?.[campo]) ? <input type="text" inputMode="numeric" className="input-numero input-tabla" value={apartamento[servicio]?.[campo] ?? ""} onChange={(evento) => onChange(apartamento.apartamentoId, servicio, campo, evento.target.value)} aria-label={`${etiqueta} ${nombre}`} /> : formatearConsumo(apartamento[servicio]?.[campo]);
+    if (!comparar) return contenido;
     return <ComparacionHover etiqueta={etiqueta} actual={apartamento[servicio]?.[campo]} anterior={anterior?.[servicio]?.[campo]} periodoAnterior={periodoAnterior} formatear={formatearConsumo}>{contenido}</ComparacionHover>;
   };
   const calculado = (etiqueta, actual, previo, moneda = false) => <ComparacionHover etiqueta={etiqueta} actual={actual} anterior={previo} periodoAnterior={periodoAnterior} formatear={moneda ? formatearPesos : formatearConsumo}>{moneda ? formatearPesos(actual) : formatearConsumo(actual)}</ComparacionHover>;
-  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía")}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua")}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td></tr>;
+  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td></tr>;
 }
 
 function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formatear, children }) {
