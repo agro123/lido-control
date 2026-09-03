@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { MESES, ANIOS } from "../helpers/constantes";
 import {
@@ -112,6 +113,36 @@ function calcularTotalRegistro(registro) {
   return cantidadValores > 0 ? total : null;
 }
 
+function obtenerMesAnterior(registro) {
+  const indiceMes = MESES.indexOf(registro.mes);
+  if (indiceMes < 0) return null;
+  return indiceMes === 0
+    ? { mes: MESES[MESES.length - 1], anio: Number(registro.anio) - 1 }
+    : { mes: MESES[indiceMes - 1], anio: Number(registro.anio) };
+}
+
+function buscarRegistroAnterior(registro, registros) {
+  const periodoAnterior = obtenerMesAnterior(registro);
+  if (!periodoAnterior) return null;
+
+  return (registros || [])
+    .filter((item) => item.mes === periodoAnterior.mes && Number(item.anio) === periodoAnterior.anio)
+    .sort((a, b) => String(b.id).localeCompare(String(a.id)))[0] || null;
+}
+
+function calcularVariacionPorcentual(actual, anterior) {
+  const valorActual = valorNumerico(actual);
+  const valorAnterior = valorNumerico(anterior);
+  if (valorActual === null || valorAnterior === null || valorAnterior === 0) return null;
+  return ((valorActual - valorAnterior) / Math.abs(valorAnterior)) * 100;
+}
+
+function textoVariacion(porcentaje) {
+  if (porcentaje === null) return null;
+  const signo = porcentaje > 0 ? "+" : "";
+  return `${signo}${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(porcentaje)}%`;
+}
+
 export default function Historial({ registros, apartamentos, eliminarRegistro, guardarRegistro }) {
   const [filtroMes, setFiltroMes] = useState("");
   const [filtroAnio, setFiltroAnio] = useState("");
@@ -133,17 +164,6 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
     }),
     [registrosConCopia, filtroMes, filtroAnio, filtroApto],
   );
-  const totalFiltrado = useMemo(() => {
-    let tieneValores = false;
-    const total = registrosFiltrados.reduce((acumulado, registro) => {
-      const totalRegistro = calcularTotalRegistro(registro);
-      if (totalRegistro !== null) tieneValores = true;
-      return totalRegistro === null ? acumulado : acumulado + totalRegistro;
-    }, 0);
-
-    return tieneValores ? total : null;
-  }, [registrosFiltrados]);
-
   function abrirDetalle(registro) {
     setRegistroDetalle(registro);
     setBorrador(clonarRegistro(registro));
@@ -232,24 +252,57 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
     </div></div>
     <div className="acciones acciones-arriba"><button type="button" className="btn btn-primario" onClick={exportarExcel}>Exportar a Excel (.xlsx)</button></div>
     {mensaje && <p className="mensaje-exito" role="status">{mensaje}</p>}
-    <div className="tarjeta tarjeta-historial-grid">{registrosFiltrados.length === 0 ? <p className="historial-vacio">No hay registros para mostrar.</p> : <><div className="historial-grid">{registrosFiltrados.map((registro) => <article key={registro.id} className="archivo-registro"><button type="button" className="archivo-registro-principal" onClick={() => abrirDetalle(registro)} aria-label={`Abrir ${registro.mes} ${registro.anio}, copia ${registro.copia}`}><span className="archivo-icono" aria-hidden="true">📁</span><span className="archivo-nombre">{registro.mes} {registro.anio} - Copia {String(registro.copia).padStart(2, "0")}</span><span className="archivo-meta">{(registro.apartamentos || []).length} apartamento(s)</span></button><button type="button" className="archivo-eliminar" onClick={() => setRegistroAEliminar(registro)} title="Eliminar este registro" aria-label={`Eliminar ${registro.mes} ${registro.anio}`}>🗑</button></article>)}</div><div className="historial-total"><span>Suma total a pagar</span><strong>{formatearPesos(totalFiltrado)}</strong></div></>}</div>
-    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} apartamentos={apartamentos} guardando={guardandoDetalle} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} />}
+    <div className="tarjeta tarjeta-historial-grid">{registrosFiltrados.length === 0 ? <p className="historial-vacio">No hay registros para mostrar.</p> : <div className="historial-grid">{registrosFiltrados.map((registro) => <article key={registro.id} className="archivo-registro"><button type="button" className="archivo-registro-principal" onClick={() => abrirDetalle(registro)} aria-label={`Abrir ${registro.mes} ${registro.anio}, copia ${registro.copia}`}><span className="archivo-icono" aria-hidden="true">📁</span><span className="archivo-nombre">{registro.mes} {registro.anio} - Copia {String(registro.copia).padStart(2, "0")}</span><span className="archivo-meta">{(registro.apartamentos || []).length} apartamento(s)</span></button><button type="button" className="archivo-eliminar" onClick={() => setRegistroAEliminar(registro)} title="Eliminar este registro" aria-label={`Eliminar ${registro.mes} ${registro.anio}`}>🗑</button></article>)}</div>}</div>
+    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} registros={registros} apartamentos={apartamentos} guardando={guardandoDetalle} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} />}
     {registroAEliminar && <div className="modal-fondo" role="presentation"><section className="modal modal-confirmacion" role="dialog" aria-modal="true" aria-labelledby="eliminar-titulo"><h3 id="eliminar-titulo">¿Eliminar registro?</h3><p>Se eliminará únicamente <strong>{registroAEliminar.mes} {registroAEliminar.anio} - Copia {String(registroAEliminar.copia).padStart(2, "0")}</strong>, junto con los datos de sus apartamentos.</p><div className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={() => setRegistroAEliminar(null)}>Cancelar</button><button type="button" className="btn btn-peligro" onClick={confirmarEliminacion}>Eliminar registro</button></div></section></div>}
   </section>;
 }
 
-function ModalDetalle({ registro, borrador, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar }) {
+function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar }) {
   const totalAPagar = calcularTotalRegistro(borrador);
+  const registroAnterior = useMemo(() => buscarRegistroAnterior(registro, registros), [registro, registros]);
+  const totalAnterior = registroAnterior ? calcularTotalRegistro(registroAnterior) : null;
+  const variacionTotal = calcularVariacionPorcentual(totalAPagar, totalAnterior);
+  const periodoAnterior = registroAnterior ? `${registroAnterior.mes} ${registroAnterior.anio}` : null;
 
-  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grid">{CAMPOS_RECIBO.map(([campo, etiqueta, ayuda]) => <CampoDetalle key={campo} etiqueta={etiqueta} ayuda={ayuda} valor={borrador.recibo?.[campo]} editable={estaFaltante(registro.recibo?.[campo])} onChange={(valor) => onActualizarRecibo(campo, valor)} moneda={!campo.includes("consumo")} />)}</div><div className="detalle-tarifas">{CAMPOS_TARIFA.map(([campo, etiqueta]) => <CampoDetalle key={campo} etiqueta={etiqueta} valor={borrador[campo]} editable={estaFaltante(registro[campo])} onChange={(valor) => onActualizarTarifa(campo, valor)} moneda />)}</div><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} tarifas={borrador} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={9}>Suma total a pagar</td><td className="celda-total-pagado">{formatearPesos(totalAPagar)}</td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button><button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button></footer></section></div>;
+  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grid">{CAMPOS_RECIBO.map(([campo, etiqueta, ayuda]) => <CampoDetalle key={campo} etiqueta={etiqueta} ayuda={ayuda} valor={borrador.recibo?.[campo]} valorAnterior={registroAnterior?.recibo?.[campo]} periodoAnterior={periodoAnterior} editable={estaFaltante(registro.recibo?.[campo])} onChange={(valor) => onActualizarRecibo(campo, valor)} moneda={!campo.includes("consumo")} />)}</div><div className="detalle-tarifas">{CAMPOS_TARIFA.map(([campo, etiqueta]) => <CampoDetalle key={campo} etiqueta={etiqueta} valor={borrador[campo]} valorAnterior={registroAnterior?.[campo]} periodoAnterior={periodoAnterior} editable={estaFaltante(registro[campo])} onChange={(valor) => onActualizarTarifa(campo, valor)} moneda />)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={9}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button><button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button></footer></section></div>;
 }
 
-function CampoDetalle({ etiqueta, ayuda, valor, editable, onChange, moneda }) {
-  return <label className="campo campo-detalle" title={ayuda || etiqueta}><span className="campo-etiqueta">{etiqueta}</span>{editable ? <input type="text" inputMode="decimal" value={valor ?? ""} onChange={(evento) => onChange(evento.target.value)} /> : <span className="valor-detalle">{moneda ? formatearPesos(valor) : formatearConsumo(valor)}</span>}</label>;
+function CampoDetalle({ etiqueta, ayuda, valor, valorAnterior, periodoAnterior, editable, onChange, moneda }) {
+  const formatear = moneda ? formatearPesos : formatearConsumo;
+  const contenido = editable ? <input type="text" inputMode="decimal" value={valor ?? ""} onChange={(evento) => onChange(evento.target.value)} /> : <span className="valor-detalle">{formatear(valor)}</span>;
+  return <label className="campo campo-detalle" title={ayuda || etiqueta}><span className="campo-etiqueta">{etiqueta}</span><ComparacionHover etiqueta={etiqueta} actual={valor} anterior={valorAnterior} periodoAnterior={periodoAnterior} formatear={formatear}>{contenido}</ComparacionHover></label>;
 }
 
-function FilaDetalle({ apartamento, nombre, original, tarifas, onChange }) {
+function FilaDetalle({ apartamento, nombre, original, anterior, tarifas, tarifasAnteriores, periodoAnterior, onChange }) {
   const calculos = calcularFilaApartamento({ lecturaAnteriorEnergia: apartamento.energia?.lecturaAnterior, lecturaActualEnergia: apartamento.energia?.lecturaActual, lecturaAnteriorAgua: apartamento.agua?.lecturaAnterior, lecturaActualAgua: apartamento.agua?.lecturaActual }, tarifas);
-  const lectura = (servicio, campo, etiqueta) => estaFaltante(original[servicio]?.[campo]) ? <input type="text" inputMode="numeric" className="input-numero input-tabla" value={apartamento[servicio]?.[campo] ?? ""} onChange={(evento) => onChange(apartamento.apartamentoId, servicio, campo, evento.target.value)} aria-label={`${etiqueta} ${nombre}`} /> : formatearConsumo(apartamento[servicio]?.[campo]);
-  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía")}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{formatearConsumo(calculos.consumoEnergia)}</td><td>{formatearPesos(calculos.costoEnergia)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua")}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{formatearConsumo(calculos.consumoAgua)}</td><td>{formatearPesos(calculos.costoAgua)}</td><td className="celda-total-pagado">{formatearPesos(calculos.totalAPagar)}</td></tr>;
+  const calculosAnteriores = anterior ? calcularFilaApartamento({ lecturaAnteriorEnergia: anterior.energia?.lecturaAnterior, lecturaActualEnergia: anterior.energia?.lecturaActual, lecturaAnteriorAgua: anterior.agua?.lecturaAnterior, lecturaActualAgua: anterior.agua?.lecturaActual }, tarifasAnteriores || {}) : {};
+  const lectura = (servicio, campo, etiqueta) => {
+    const contenido = estaFaltante(original[servicio]?.[campo]) ? <input type="text" inputMode="numeric" className="input-numero input-tabla" value={apartamento[servicio]?.[campo] ?? ""} onChange={(evento) => onChange(apartamento.apartamentoId, servicio, campo, evento.target.value)} aria-label={`${etiqueta} ${nombre}`} /> : formatearConsumo(apartamento[servicio]?.[campo]);
+    return <ComparacionHover etiqueta={etiqueta} actual={apartamento[servicio]?.[campo]} anterior={anterior?.[servicio]?.[campo]} periodoAnterior={periodoAnterior} formatear={formatearConsumo}>{contenido}</ComparacionHover>;
+  };
+  const calculado = (etiqueta, actual, previo, moneda = false) => <ComparacionHover etiqueta={etiqueta} actual={actual} anterior={previo} periodoAnterior={periodoAnterior} formatear={moneda ? formatearPesos : formatearConsumo}>{moneda ? formatearPesos(actual) : formatearConsumo(actual)}</ComparacionHover>;
+  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía")}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua")}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td></tr>;
+}
+
+function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formatear, children }) {
+  const disparador = useRef(null);
+  const [posicion, setPosicion] = useState(null);
+  const valorActual = valorNumerico(actual);
+  const valorAnterior = valorNumerico(anterior);
+  if (valorActual === null || valorAnterior === null) return children;
+
+  const maximo = Math.max(Math.abs(valorActual), Math.abs(valorAnterior), 1);
+  const etiquetaAnterior = periodoAnterior || "mes anterior";
+  const mostrar = () => {
+    const rectangulo = disparador.current?.getBoundingClientRect();
+    if (!rectangulo) return;
+    setPosicion({
+      top: rectangulo.top > 160 ? rectangulo.top - 150 : rectangulo.bottom + 8,
+      left: Math.max(104, Math.min(window.innerWidth - 104, rectangulo.left + (rectangulo.width / 2))),
+    });
+  };
+  const ocultar = () => setPosicion(null);
+  const grafico = posicion && <span className="comparacion-popover" role="tooltip" style={{ top: posicion.top, left: posicion.left }}><strong>{etiqueta}</strong><span className="comparacion-periodos"><span>Mes actual</span><span>{etiquetaAnterior}</span></span><span className="comparacion-barras"><span className="comparacion-barra"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorActual) / maximo) * 100, 5)}%` }} /><b>{formatear(valorActual)}</b></span><span className="comparacion-barra comparacion-barra-anterior"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorAnterior) / maximo) * 100, 5)}%` }} /><b>{formatear(valorAnterior)}</b></span></span></span>;
+  return <><span ref={disparador} className="comparacion-hover" tabIndex={0} onMouseEnter={mostrar} onMouseLeave={ocultar} onFocus={mostrar} onBlur={ocultar} aria-label={`${etiqueta}. Actual: ${formatear(valorActual)}. ${etiquetaAnterior}: ${formatear(valorAnterior)}.`}>{children}</span>{grafico && createPortal(grafico, document.body)}</>;
 }
