@@ -55,14 +55,23 @@ function crearFilaConMesAnterior(apartamentoId, datosMesAnterior) {
 }
 
 /**
- * Obtiene el mes y año actuales en español.
+ * Obtiene el periodo inicial (mes anterior) y conserva la fecha real para mostrarla.
  */
 function obtenerMesAnioActual() {
   const ahora = new Date();
-  return {
-    mes: MESES[ahora.getMonth()],
-    anio: ahora.getFullYear(),
-  };
+  const periodoAnterior = obtenerMesAnioAnterior(
+    MESES[ahora.getMonth()],
+    ahora.getFullYear(),
+  );
+  return { ...periodoAnterior, fecha: ahora };
+}
+
+function formatearFechaActual(fecha) {
+  return fecha.toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function calcularTarifasDesdeRecibo({
@@ -520,7 +529,11 @@ export default function RegistroMensual({
 
       <div className="tarjeta tarjeta-compacta" ref={camposReciboRef}>
         <div className="form-fila form-fila-registro-periodo">
-          <label className="campo">
+          <label
+            className="campo tooltip"
+            data-tooltip="Mes al que corresponden las lecturas y el cálculo del servicio."
+            title="Mes al que corresponden las lecturas y el cálculo del servicio."
+          >
             <span className="campo-etiqueta">Mes</span>
             <select
               value={mes}
@@ -537,7 +550,11 @@ export default function RegistroMensual({
             </select>
           </label>
 
-          <label className="campo">
+          <label
+            className="campo tooltip"
+            data-tooltip="Año al que corresponden las lecturas y el cálculo del servicio."
+            title="Año al que corresponden las lecturas y el cálculo del servicio."
+          >
             <span className="campo-etiqueta">Año</span>
             <select
               value={anio}
@@ -553,13 +570,21 @@ export default function RegistroMensual({
               ))}
             </select>
           </label>
+
+          <div
+            className="fecha-actual"
+            title={`Fecha actual: ${formatearFechaActual(inicial.fecha)}`}
+          >
+            <span aria-hidden="true">📅</span>
+            <span>Hoy: {formatearFechaActual(inicial.fecha)}</span>
+          </div>
         </div>
 
         <div className="form-fila-registro-grupos">
           <div className="bloque-tarifa">
             <h4>Energía</h4>
             <div className="form-fila form-fila-bloque-tarifa">
-              <label className="campo">
+            <label className="campo tooltip" data-tooltip="Valor total del recibo de energía del periodo." title="Valor total del recibo de energía del periodo.">
                 <span className="campo-etiqueta">Total energía recibo ($)</span>
                 <input
                   type="text"
@@ -575,7 +600,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Consumo total de energía indicado en el recibo, en kWh." title="Consumo total de energía indicado en el recibo, en kWh.">
                 <span className="campo-etiqueta">Consumo energía total (kWh)</span>
                 <input
                   type="text"
@@ -591,7 +616,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Tarifa calculada por cada kWh consumido." title="Tarifa calculada por cada kWh consumido.">
                 <span className="campo-etiqueta">Tarifa Energía ($/kWh)</span>
                 <span className="valor-etiqueta"> {formatearPesos(tarifaEnergia)}</span>
               </label>
@@ -601,7 +626,7 @@ export default function RegistroMensual({
           <div className="bloque-tarifa">
             <h4>Agua</h4>
             <div className="form-fila form-fila-bloque-tarifa">
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Costo de alcantarillado del recibo de agua del periodo." title="Costo de alcantarillado del recibo de agua del periodo.">
                 <span className="campo-etiqueta">Costo alcantarillado ($)</span>
                 <input
                   type="text"
@@ -617,7 +642,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Costo de acueducto del recibo de agua del periodo." title="Costo de acueducto del recibo de agua del periodo.">
                 <span className="campo-etiqueta">Costo acueducto ($)</span>
                 <input
                   type="text"
@@ -633,7 +658,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Consumo total de agua indicado en el recibo, en m³." title="Consumo total de agua indicado en el recibo, en m³.">
                 <span className="campo-etiqueta">Consumo agua total (m³)</span>
                 <input
                   type="text"
@@ -649,7 +674,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Tarifa calculada por cada m³ de agua consumido." title="Tarifa calculada por cada m³ de agua consumido.">
                 <span className="campo-etiqueta">Tarifa Agua ($/m³)</span>
                 <span className="valor-etiqueta">{formatearPesos(tarifaAgua)}</span>
               </label>
@@ -659,7 +684,7 @@ export default function RegistroMensual({
           <div className="bloque-tarifa">
             <h4>Fijo</h4>
             <div className="form-fila form-fila-bloque-tarifa">
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Valor de servicios varios del recibo del periodo." title="Valor de servicios varios del recibo del periodo.">
                 <span className="campo-etiqueta">Servicios varios ($)</span>
                 <input
                   type="text"
@@ -675,7 +700,7 @@ export default function RegistroMensual({
                   }}
                 />
               </label>
-              <label className="campo">
+              <label className="campo tooltip" data-tooltip="Tarifa fija calculada por apartamento." title="Tarifa fija calculada por apartamento.">
                 <span className="campo-etiqueta">Tarifa Fija ($)</span>
                 <span className="valor-etiqueta">{formatearPesos(tarifaFija)}</span>
               </label>
@@ -732,6 +757,7 @@ export default function RegistroMensual({
                       type="text"
                       inputMode="numeric"
                       className="input-numero input-tabla"
+                      title="Lectura del medidor de energía al inicio del periodo."
                       data-fila={indice}
                       data-columna={0}
                       value={fila.lecturaAnteriorEnergia}
@@ -752,6 +778,7 @@ export default function RegistroMensual({
                       type="text"
                       inputMode="numeric"
                       className="input-numero input-tabla"
+                      title="Lectura del medidor de energía al final del periodo."
                       data-fila={indice}
                       data-columna={1}
                       value={fila.lecturaActualEnergia}
@@ -767,10 +794,10 @@ export default function RegistroMensual({
                       aria-label={`Lectura actual energía ${fila.nombre}`}
                     />
                   </td>
-                  <td className="col-energia celda-calculada">
+                  <td className="col-energia celda-calculada" title="Consumo de energía del apartamento: lectura actual menos lectura anterior.">
                     {formatearConsumo(fila.calculos.consumoEnergia)}
                   </td>
-                  <td className="col-energia celda-calculada">
+                  <td className="col-energia celda-calculada" title="Costo de energía calculado con el consumo y la tarifa vigente.">
                     {formatearPesos(fila.calculos.costoEnergia)}
                   </td>
                   <td className="col-agua">
@@ -778,6 +805,7 @@ export default function RegistroMensual({
                       type="text"
                       inputMode="numeric"
                       className="input-numero input-tabla"
+                      title="Lectura del medidor de agua al inicio del periodo."
                       data-fila={indice}
                       data-columna={2}
                       value={fila.lecturaAnteriorAgua}
@@ -798,6 +826,7 @@ export default function RegistroMensual({
                       type="text"
                       inputMode="numeric"
                       className="input-numero input-tabla"
+                      title="Lectura del medidor de agua al final del periodo."
                       data-fila={indice}
                       data-columna={3}
                       value={fila.lecturaActualAgua}
@@ -813,13 +842,13 @@ export default function RegistroMensual({
                       aria-label={`Lectura actual agua ${fila.nombre}`}
                     />
                   </td>
-                  <td className="col-agua celda-calculada">
+                  <td className="col-agua celda-calculada" title="Consumo de agua del apartamento: lectura actual menos lectura anterior.">
                     {formatearConsumo(fila.calculos.consumoAgua)}
                   </td>
-                  <td className="col-agua celda-calculada">
+                  <td className="col-agua celda-calculada" title="Costo de agua calculado con el consumo y la tarifa vigente.">
                     {formatearPesos(fila.calculos.costoAgua)}
                   </td>
-                  <td className="col-total celda-calculada">
+                  <td className="col-total celda-calculada" title="Total a pagar por el apartamento, incluyendo energía, agua y tarifa fija.">
                     {formatearPesos(fila.calculos.totalAPagar)}
                   </td>
                 </tr>
