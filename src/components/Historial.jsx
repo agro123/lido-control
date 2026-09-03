@@ -293,6 +293,7 @@ function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formate
   if (valorActual === null || valorAnterior === null) return children;
 
   const maximo = Math.max(Math.abs(valorActual), Math.abs(valorAnterior), 1);
+  const variacion = calcularVariacionPorcentual(valorActual, valorAnterior);
   const etiquetaAnterior = periodoAnterior || "mes anterior";
   const mostrar = () => {
     const rectangulo = disparador.current?.getBoundingClientRect();
@@ -303,6 +304,6 @@ function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formate
     });
   };
   const ocultar = () => setPosicion(null);
-  const grafico = posicion && <span className="comparacion-popover" role="tooltip" style={{ top: posicion.top, left: posicion.left }}><strong>{etiqueta}</strong><span className="comparacion-periodos"><span>Mes actual</span><span>{etiquetaAnterior}</span></span><span className="comparacion-barras"><span className="comparacion-barra"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorActual) / maximo) * 100, 5)}%` }} /><b>{formatear(valorActual)}</b></span><span className="comparacion-barra comparacion-barra-anterior"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorAnterior) / maximo) * 100, 5)}%` }} /><b>{formatear(valorAnterior)}</b></span></span></span>;
+  const grafico = posicion && <span className="comparacion-popover" role="tooltip" style={{ top: posicion.top, left: posicion.left }}><strong>{etiqueta}</strong><span className="comparacion-periodos"><span>Mes actual</span><span>{etiquetaAnterior}</span></span><span className="comparacion-barras"><span className="comparacion-barra"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorActual) / maximo) * 100, 5)}%` }} /><b>{formatear(valorActual)}</b></span><span className="comparacion-barra comparacion-barra-anterior"><i style={{ "--altura-barra": `${Math.max((Math.abs(valorAnterior) / maximo) * 100, 5)}%` }} /><b>{formatear(valorAnterior)}</b></span></span><span className={`comparacion-variacion ${variacion > 0 ? "variacion-sube" : variacion < 0 ? "variacion-baja" : ""}`}>Diferencia: {textoVariacion(variacion) || "sin base"}</span></span>;
   return <><span ref={disparador} className="comparacion-hover" tabIndex={0} onMouseEnter={mostrar} onMouseLeave={ocultar} onFocus={mostrar} onBlur={ocultar} aria-label={`${etiqueta}. Actual: ${formatear(valorActual)}. ${etiquetaAnterior}: ${formatear(valorAnterior)}.`}>{children}</span>{grafico && createPortal(grafico, document.body)}</>;
 }
