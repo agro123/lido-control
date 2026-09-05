@@ -285,7 +285,7 @@ function rectanguloRedondeado(contexto, x, y, ancho, alto, radio) {
   contexto.closePath();
 }
 
-function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, onMensaje = () => {} }) {
+function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija, onMensaje = () => {} }) {
   const canvas = document.createElement("canvas");
   canvas.width = 1800;
   canvas.height = 1240;
@@ -298,7 +298,7 @@ function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, onMen
   contexto.fillRect(0, 0, canvas.width, 205);
   contexto.fillStyle = "#ffffff";
   contexto.font = "700 54px Arial, sans-serif";
-  contexto.fillText("Resumen de servicio", 95, 90);
+  contexto.fillText("Resumen de servicio públicos", 95, 90);
   contexto.font = "400 30px Arial, sans-serif";
   contexto.fillText(periodo, 95, 145);
   contexto.font = "700 38px Arial, sans-serif";
@@ -350,9 +350,16 @@ function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, onMen
   contexto.textAlign = "right";
   contexto.fillText(formatearPesos(calculos.totalAPagar), 1650, 1010);
   contexto.textAlign = "left";
+
+  if (tarifaFija !== null && tarifaFija !== undefined && Number.isFinite(Number(tarifaFija))) {
+    contexto.fillStyle = "#d9eaf7";
+    contexto.font = "600 24px Arial, sans-serif";
+    contexto.fillText(`+ servicios básicos ${formatearPesos(tarifaFija)}`, 150, 1048);
+  }
+
   contexto.fillStyle = "#66798b";
   contexto.font = "400 23px Arial, sans-serif";
-  contexto.fillText("Comprobante generado desde Lido Control", 95, 1170);
+  contexto.fillText("Comprobante generado desde Lido Control by CDM", 95, 1170);
 
   canvas.toBlob((archivo) => {
     if (!archivo) return;
@@ -410,7 +417,8 @@ function FilaDetalle({ apartamento, nombre, original, anterior, tarifas, tarifas
     return <ComparacionHover etiqueta={etiqueta} actual={apartamento[servicio]?.[campo]} anterior={anterior?.[servicio]?.[campo]} periodoAnterior={periodoAnterior} formatear={formatearConsumo}>{contenido}</ComparacionHover>;
   };
   const calculado = (etiqueta, actual, previo, moneda = false) => <ComparacionHover etiqueta={etiqueta} actual={actual} anterior={previo} periodoAnterior={periodoAnterior} formatear={moneda ? formatearPesos : formatearConsumo}>{moneda ? formatearPesos(actual) : formatearConsumo(actual)}</ComparacionHover>;
-  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, onMensaje })} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button></td></tr>;
+  const tarifaFija = tarifas?.tarifaFija ?? 0;
+  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija, onMensaje })} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button></td></tr>;
 }
 
 function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formatear, children }) {
