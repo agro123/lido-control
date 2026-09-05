@@ -307,7 +307,7 @@ function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarif
   const columnas = [95, 925];
   const secciones = [
     ["Energía", [["Lectura anterior", formatearConsumo(apartamento.energia?.lecturaAnterior)], ["Lectura actual", formatearConsumo(apartamento.energia?.lecturaActual)], ["Consumo", `${formatearConsumo(calculos.consumoEnergia)} kWh`], ["Total energía", formatearPesos(calculos.costoEnergia)]]],
-    ["Agua", [["Lectura anterior", formatearConsumo(apartamento.agua?.lecturaAnterior)], ["Lectura actual", formatearConsumo(apartamento.agua?.lecturaActual)], ["Consumo", `${formatearConsumo(calculos.consumoAgua)} m³`], ["Total agua", formatearPesos(calculos.costoAgua)]]],
+    ["Acueducto y alcantarillado", [["Lectura anterior", formatearConsumo(apartamento.agua?.lecturaAnterior)], ["Lectura actual", formatearConsumo(apartamento.agua?.lecturaActual)], ["Consumo", `${formatearConsumo(calculos.consumoAgua)} m³`], ["Total agua", formatearPesos(calculos.costoAgua)]]],
   ];
 
   secciones.forEach(([titulo, filas], indice) => {
