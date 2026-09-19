@@ -1,4 +1,12 @@
 import { useState } from "react";
+import { normalizarInputNumerico } from "../helpers/formato";
+
+/** Un celular colombiano: 10 dígitos que empiezan por 3. Vacío es válido (WhatsApp sin número). */
+function celularValido(texto) {
+  return texto === "" || /^3\d{9}$/.test(texto);
+}
+
+const MENSAJE_CELULAR = "El WhatsApp debe tener 10 dígitos y empezar por 3 (ej: 3001234567).";
 
 /**
  * Configuración de apartamentos: listar, agregar, renombrar y eliminar.
@@ -7,6 +15,8 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [nombreEdicion, setNombreEdicion] = useState("");
+  const [telefonoNuevo, setTelefonoNuevo] = useState("");
+  const [telefonoEdicion, setTelefonoEdicion] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
@@ -22,11 +32,20 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
       return;
     }
 
+    if (!celularValido(telefonoNuevo)) {
+      setError(MENSAJE_CELULAR);
+      return;
+    }
+
     const maxId = apartamentos.reduce((max, a) => Math.max(max, a.id), 0);
-    const actualizados = [...apartamentos, { id: maxId + 1, nombre }];
+    const actualizados = [
+      ...apartamentos,
+      { id: maxId + 1, nombre, ...(telefonoNuevo ? { telefono: telefonoNuevo } : {}) },
+    ];
     const ok = await guardarApartamentos(actualizados, []);
     if (ok) {
       setNombreNuevo("");
+      setTelefonoNuevo("");
       setMensaje(`Apartamento "${nombre}" agregado.`);
     } else {
       setError("No se pudo agregar el apartamento.");
@@ -37,6 +56,7 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
   function iniciarEdicion(apto) {
     setEditandoId(apto.id);
     setNombreEdicion(apto.nombre);
+    setTelefonoEdicion(apto.telefono || "");
     setError("");
     setMensaje("");
   }
@@ -49,16 +69,24 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
       return;
     }
 
-    const actualizados = apartamentos.map((a) =>
-      a.id === aptoId ? { ...a, nombre } : a,
-    );
+    if (!celularValido(telefonoEdicion)) {
+      setError(MENSAJE_CELULAR);
+      return;
+    }
+
+    const actualizados = apartamentos.map((a) => {
+      if (a.id !== aptoId) return a;
+      const { telefono: _anterior, ...resto } = a;
+      return { ...resto, nombre, ...(telefonoEdicion ? { telefono: telefonoEdicion } : {}) };
+    });
     const ok = await guardarApartamentos(actualizados, []);
     if (ok) {
       setEditandoId(null);
       setNombreEdicion("");
-      setMensaje("Nombre actualizado.");
+      setTelefonoEdicion("");
+      setMensaje("Apartamento actualizado.");
     } else {
-      setError("No se pudo renombrar el apartamento.");
+      setError("No se pudo actualizar el apartamento.");
     }
   }
 
@@ -93,7 +121,7 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
     <section className="pagina">
       <header className="pagina-encabezado">
         <h2>Configuración de Apartamentos</h2>
-        <p>Agregue, renombre o elimine apartamentos del edificio.</p>
+        <p>Agregue, edite (nombre y WhatsApp) o elimine apartamentos del edificio.</p>
       </header>
 
       <div className="tarjeta">
@@ -107,6 +135,16 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
               onChange={(e) => setNombreNuevo(e.target.value)}
               placeholder="Ej: Apto 5 — Familia Pérez"
               maxLength={80}
+            />
+          </label>
+          <label className="campo">
+            <span className="campo-etiqueta">WhatsApp (opcional)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={telefonoNuevo}
+              onChange={(e) => setTelefonoNuevo(normalizarInputNumerico(e.target.value).slice(0, 10))}
+              placeholder="3001234567"
             />
           </label>
           <div className="campo campo-accion">
@@ -142,12 +180,23 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
                     maxLength={80}
                     aria-label={`Nuevo nombre para ${apto.nombre}`}
                   />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="input-telefono"
+                    value={telefonoEdicion}
+                    onChange={(e) =>
+                      setTelefonoEdicion(normalizarInputNumerico(e.target.value).slice(0, 10))
+                    }
+                    placeholder="WhatsApp: 3001234567"
+                    aria-label={`WhatsApp de ${apto.nombre}`}
+                  />
                   <button
                     type="button"
                     className="btn btn-primario btn-pequeno"
                     onClick={() => guardarEdicion(apto.id)}
                   >
-                    Guardar nombre
+                    Guardar
                   </button>
                   <button
                     type="button"
@@ -161,6 +210,9 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
                 <>
                   <span className="nombre-apartamento">
                     <strong>#{apto.id}</strong> {apto.nombre}
+                    <span className="telefono-apartamento">
+                      {apto.telefono ? `WhatsApp +57 ${apto.telefono}` : "Sin WhatsApp"}
+                    </span>
                   </span>
                   <div className="acciones-apartamento">
                     <button
@@ -168,7 +220,7 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
                       className="btn btn-secundario btn-pequeno"
                       onClick={() => iniciarEdicion(apto)}
                     >
-                      Renombrar
+                      Editar
                     </button>
                     <button
                       type="button"

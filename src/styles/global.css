@@ -406,7 +406,7 @@ button {
 }
 
 .form-agregar {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 200px auto;
   align-items: end;
 }
 
@@ -514,6 +514,12 @@ button {
 .aviso-tarifas-inline {
   margin: 4px 0 0;
   padding: 6px 10px;
+}
+
+.aviso-wp {
+  background: #eafaf0;
+  border-color: #25a244;
+  color: #146c2e;
 }
 
 .aviso-advertencia {
@@ -732,6 +738,16 @@ button {
 
 .tabla-registro .celda-nombre {
   width: 12%;
+}
+
+.tabla-registro .col-num {
+  width: 26px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.tabla-registro .col-compartir {
+  width: 92px;
 }
 
 .tabla .celda-calculada {
@@ -1406,4 +1422,34 @@ button {
   #root {
     overflow: auto;
   }
+}
+
+.telefono-apartamento {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-texto-secundario);
+}
+
+.edicion-apartamento .input-telefono {
+  flex: 0 0 200px;
+  min-width: 0;
+}
+
+.celdas-compartir {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-whatsapp {
+  border-color: #25a244;
+  background: #eafaf0;
+  color: #146c2e;
+}
+
+.btn-whatsapp:hover,
+.btn-whatsapp:focus-visible {
+  border-color: #146c2e;
+  background: #d3f3df;
 }

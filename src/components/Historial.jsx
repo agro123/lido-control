@@ -8,6 +8,7 @@ import {
   calcularTarifaEnergia,
   calcularTarifaFija,
 } from "../helpers/calculos";
+import { descargarFilaComoImagen, compartirResumenPorWhatsApp } from "../helpers/resumenImagen";
 import {
   aNumeroONull,
   formatearConsumo,
@@ -274,107 +275,6 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
   </section>;
 }
 
-function rectanguloRedondeado(contexto, x, y, ancho, alto, radio) {
-  const radioSeguro = Math.min(radio, ancho / 2, alto / 2);
-  contexto.beginPath();
-  contexto.moveTo(x + radioSeguro, y);
-  contexto.arcTo(x + ancho, y, x + ancho, y + alto, radioSeguro);
-  contexto.arcTo(x + ancho, y + alto, x, y + alto, radioSeguro);
-  contexto.arcTo(x, y + alto, x, y, radioSeguro);
-  contexto.arcTo(x, y, x + ancho, y, radioSeguro);
-  contexto.closePath();
-}
-
-function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija, onMensaje = () => {} }) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1800;
-  canvas.height = 1240;
-  const contexto = canvas.getContext("2d");
-  if (!contexto) return;
-
-  contexto.fillStyle = "#eef3f8";
-  contexto.fillRect(0, 0, canvas.width, canvas.height);
-  contexto.fillStyle = "#1d4f7a";
-  contexto.fillRect(0, 0, canvas.width, 205);
-  contexto.fillStyle = "#ffffff";
-  contexto.font = "700 54px Arial, sans-serif";
-  contexto.fillText("Resumen de servicio públicos", 95, 90);
-  contexto.font = "400 30px Arial, sans-serif";
-  contexto.fillText(periodo, 95, 145);
-  contexto.font = "700 38px Arial, sans-serif";
-  contexto.fillText(nombre, 95, 185);
-
-  const columnas = [95, 925];
-  const secciones = [
-    ["Energía", [["Lectura anterior", formatearConsumo(apartamento.energia?.lecturaAnterior)], ["Lectura actual", formatearConsumo(apartamento.energia?.lecturaActual)], ["Consumo", `${formatearConsumo(calculos.consumoEnergia)} kWh`], ["Total energía", formatearPesos(calculos.costoEnergia)]]],
-    ["Acueducto y alcantarillado", [["Lectura anterior", formatearConsumo(apartamento.agua?.lecturaAnterior)], ["Lectura actual", formatearConsumo(apartamento.agua?.lecturaActual)], ["Consumo", `${formatearConsumo(calculos.consumoAgua)} m³`], ["Total agua", formatearPesos(calculos.costoAgua)]]],
-  ];
-
-  secciones.forEach(([titulo, filas], indice) => {
-    const x = columnas[indice];
-    contexto.fillStyle = "#ffffff";
-    rectanguloRedondeado(contexto, x, 275, 780, 500, 26);
-    contexto.fill();
-    contexto.fillStyle = "#1d4f7a";
-    contexto.font = "700 34px Arial, sans-serif";
-    contexto.fillText(titulo, x + 42, 340);
-    filas.forEach(([etiqueta, valor], fila) => {
-      const y = 410 + (fila * 80);
-      contexto.fillStyle = "#6c7c8c";
-      contexto.font = "400 26px Arial, sans-serif";
-      contexto.fillText(etiqueta, x + 42, y);
-      contexto.fillStyle = "#17324d";
-      contexto.font = "700 30px Arial, sans-serif";
-      contexto.textAlign = "right";
-      contexto.fillText(valor, x + 735, y);
-      contexto.textAlign = "left";
-      if (fila < filas.length - 1) {
-        contexto.strokeStyle = "#dbe4ed";
-        contexto.lineWidth = 2;
-        contexto.beginPath();
-        contexto.moveTo(x + 42, y + 28);
-        contexto.lineTo(x + 735, y + 28);
-        contexto.stroke();
-      }
-    });
-  });
-
-  contexto.fillStyle = "#123b5d";
-  rectanguloRedondeado(contexto, 95, 865, 1610, 230, 28);
-  contexto.fill();
-  contexto.fillStyle = "#d9eaf7";
-  contexto.font = "700 31px Arial, sans-serif";
-  contexto.fillText("TOTAL A PAGAR", 150, 955);
-  contexto.fillStyle = "#ffffff";
-  contexto.font = "700 82px Arial, sans-serif";
-  contexto.textAlign = "right";
-  contexto.fillText(formatearPesos(calculos.totalAPagar), 1650, 1010);
-  contexto.textAlign = "left";
-
-  if (tarifaFija !== null && tarifaFija !== undefined && Number.isFinite(Number(tarifaFija))) {
-    contexto.fillStyle = "#d9eaf7";
-    contexto.font = "600 24px Arial, sans-serif";
-    contexto.fillText(`+ Otros servicios ${formatearPesos(tarifaFija)}`, 150, 1048);
-  }
-
-  contexto.fillStyle = "#66798b";
-  contexto.font = "400 23px Arial, sans-serif";
-  contexto.fillText("Comprobante generado desde Lido Control by CDM", 95, 1170);
-
-  canvas.toBlob((archivo) => {
-    if (!archivo) return;
-    const enlace = document.createElement("a");
-    const nombreArchivo = nombre.toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/(^-|-$)/g, "");
-    enlace.href = URL.createObjectURL(archivo);
-    enlace.download = `resumen-${nombreArchivo}-${periodo.toLowerCase().replace(/\s+/g, "-")}.jpg`;
-    document.body.appendChild(enlace);
-    enlace.click();
-    enlace.remove();
-    URL.revokeObjectURL(enlace.href);
-    onMensaje("Imagen guardada en descargas");
-  }, "image/jpeg", 0.96);
-}
-
 function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar, onExportar }) {
   const [mensajeModal, setMensajeModal] = useState("");
   const totalAPagar = calcularTotalRegistro(borrador);
@@ -390,7 +290,7 @@ function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, 
     return () => clearTimeout(temporizador);
   }, [mensajeModal]);
 
-  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grupos">{GRUPOS_DATOS_RECIBO.map(([grupo, campos]) => <div className="bloque-tarifa" key={grupo}><h4>{grupo}</h4><div className="form-fila form-fila-bloque-tarifa">{campos.map(([tipo, campo]) => <CampoReciboDetalle key={`${tipo}-${campo}`} tipo={tipo} campo={campo} borrador={borrador} registro={registro} registroAnterior={registroAnterior} periodoAnterior={periodoAnterior} onActualizarRecibo={onActualizarRecibo} onActualizarTarifa={onActualizarTarifa} />)}</div></div>)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4>{mensajeModal && <div className="alerta-jpg" role="status">{mensajeModal}</div>}<div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th><th>Imagen</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} periodo={`${registro.mes} ${registro.anio}`} onChange={onActualizarLectura} onMensaje={setMensajeModal} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={10}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onExportar}>Exportar a Excel (.xlsx)</button><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button>{puedeCompletar && <button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button>}</footer></section></div>;
+  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grupos">{GRUPOS_DATOS_RECIBO.map(([grupo, campos]) => <div className="bloque-tarifa" key={grupo}><h4>{grupo}</h4><div className="form-fila form-fila-bloque-tarifa">{campos.map(([tipo, campo]) => <CampoReciboDetalle key={`${tipo}-${campo}`} tipo={tipo} campo={campo} borrador={borrador} registro={registro} registroAnterior={registroAnterior} periodoAnterior={periodoAnterior} onActualizarRecibo={onActualizarRecibo} onActualizarTarifa={onActualizarTarifa} />)}</div></div>)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4>{mensajeModal && <div className="alerta-jpg" role="status">{mensajeModal}</div>}<div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th><th>Imagen</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} telefono={apartamentos.find((item) => item.id === apto.apartamentoId)?.telefono} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} periodo={`${registro.mes} ${registro.anio}`} onChange={onActualizarLectura} onMensaje={setMensajeModal} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={10}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onExportar}>Exportar a Excel (.xlsx)</button><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button>{puedeCompletar && <button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button>}</footer></section></div>;
 }
 
 function CampoReciboDetalle({ tipo, campo, borrador, registro, registroAnterior, periodoAnterior, onActualizarRecibo, onActualizarTarifa }) {
@@ -408,7 +308,7 @@ function CampoDetalle({ etiqueta, ayuda, valor, valorAnterior, periodoAnterior, 
   return <label className="campo campo-detalle" title={ayuda || etiqueta}><span className="campo-etiqueta">{etiqueta}</span><ComparacionHover etiqueta={etiqueta} actual={valor} anterior={valorAnterior} periodoAnterior={periodoAnterior} formatear={formatear}>{contenido}</ComparacionHover></label>;
 }
 
-function FilaDetalle({ apartamento, nombre, original, anterior, tarifas, tarifasAnteriores, periodoAnterior, periodo, onChange, onMensaje }) {
+function FilaDetalle({ apartamento, nombre, telefono, original, anterior, tarifas, tarifasAnteriores, periodoAnterior, periodo, onChange, onMensaje }) {
   const calculos = calcularFilaApartamento({ lecturaAnteriorEnergia: apartamento.energia?.lecturaAnterior, lecturaActualEnergia: apartamento.energia?.lecturaActual, lecturaAnteriorAgua: apartamento.agua?.lecturaAnterior, lecturaActualAgua: apartamento.agua?.lecturaActual }, tarifas);
   const calculosAnteriores = anterior ? calcularFilaApartamento({ lecturaAnteriorEnergia: anterior.energia?.lecturaAnterior, lecturaActualEnergia: anterior.energia?.lecturaActual, lecturaAnteriorAgua: anterior.agua?.lecturaAnterior, lecturaActualAgua: anterior.agua?.lecturaActual }, tarifasAnteriores || {}) : {};
   const lectura = (servicio, campo, etiqueta, comparar = true) => {
@@ -418,7 +318,7 @@ function FilaDetalle({ apartamento, nombre, original, anterior, tarifas, tarifas
   };
   const calculado = (etiqueta, actual, previo, moneda = false) => <ComparacionHover etiqueta={etiqueta} actual={actual} anterior={previo} periodoAnterior={periodoAnterior} formatear={moneda ? formatearPesos : formatearConsumo}>{moneda ? formatearPesos(actual) : formatearConsumo(actual)}</ComparacionHover>;
   const tarifaFija = tarifas?.tarifaFija ?? 0;
-  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija, onMensaje })} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button></td></tr>;
+  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td className="celdas-compartir"><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija, onMensaje })} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button><button type="button" className="btn-exportar-fila btn-whatsapp" onClick={() => compartirResumenPorWhatsApp({ periodo, nombre, apartamento, calculos, tarifaFija, telefono, onMensaje })} title={telefono ? `Enviar resumen a ${nombre} por WhatsApp` : `Enviar resumen por WhatsApp (${nombre} no tiene número; elija el contacto)`} aria-label={`Enviar resumen de ${nombre} por WhatsApp`}>WP</button></td></tr>;
 }
 
 function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formatear, children }) {

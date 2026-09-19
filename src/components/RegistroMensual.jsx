@@ -8,6 +8,7 @@ import {
 } from "../helpers/calculos";
 import { obtenerMesAnioAnterior } from "../helpers/fechas";
 import { extraerDatosRecibo, obtenerUsoRecibo } from "../helpers/reciboPdf";
+import { compartirResumenPorWhatsApp, descargarFilaComoImagen } from "../helpers/resumenImagen";
 import {
   aNumeroONull,
   formatearConsumo,
@@ -119,6 +120,7 @@ export default function RegistroMensual({
   const [guardando, setGuardando] = useState(false);
   const [leyendoPdf, setLeyendoPdf] = useState(false);
   const [usoPdf, setUsoPdf] = useState(null);
+  const [mensajeWp, setMensajeWp] = useState("");
   const [origenMesAnterior, setOrigenMesAnterior] = useState(null);
   const tablaRef = useRef(null);
   const camposReciboRef = useRef(null);
@@ -177,6 +179,13 @@ export default function RegistroMensual({
   useEffect(() => {
     obtenerUsoRecibo().then(setUsoPdf).catch(() => setUsoPdf(null));
   }, []);
+
+  /** El mensaje de WhatsApp reemplaza el recordatorio de tarifas durante unos segundos. */
+  useEffect(() => {
+    if (!mensajeWp) return undefined;
+    const temporizador = setTimeout(() => setMensajeWp(""), 15000);
+    return () => clearTimeout(temporizador);
+  }, [mensajeWp]);
 
   const limitePdfAlcanzado = usoPdf !== null && usoPdf.usados >= usoPdf.maximo;
 
@@ -368,6 +377,46 @@ export default function RegistroMensual({
       })),
     [filas, tarifas, apartamentos],
   );
+
+  /** Verdadero cuando ya están todas las tarifas y todas las lecturas, sin errores. */
+  const datosCompletos = useMemo(
+    () =>
+      [tarifaEnergia, tarifaAgua, tarifaFija].every((t) => aNumeroONull(t) !== null) &&
+      filasCalculadas.length > 0 &&
+      filasCalculadas.every(
+        (fila) =>
+          [
+            fila.lecturaAnteriorEnergia,
+            fila.lecturaActualEnergia,
+            fila.lecturaAnteriorAgua,
+            fila.lecturaActualAgua,
+          ].every((valor) => valor !== "") &&
+          !fila.calculos.energiaInvalida &&
+          !fila.calculos.aguaInvalida,
+      ),
+    [tarifaEnergia, tarifaAgua, tarifaFija, filasCalculadas],
+  );
+
+  /** Datos de una fila en el formato que usa la imagen de resumen. */
+  function datosResumen(fila) {
+    return {
+      periodo: `${mes} ${anio}`,
+      nombre: fila.nombre,
+      apartamento: {
+        energia: {
+          lecturaAnterior: Number(fila.lecturaAnteriorEnergia),
+          lecturaActual: Number(fila.lecturaActualEnergia),
+        },
+        agua: {
+          lecturaAnterior: Number(fila.lecturaAnteriorAgua),
+          lecturaActual: Number(fila.lecturaActualAgua),
+        },
+      },
+      calculos: fila.calculos,
+      tarifaFija: aNumeroONull(tarifaFija) ?? 0,
+      onMensaje: setExito,
+    };
+  }
 
   /** Totales de la fila inferior. */
   const totales = useMemo(() => {
@@ -802,12 +851,18 @@ export default function RegistroMensual({
           </div>
         </div>
 
-        <p className="aviso-tarifas aviso-tarifas-inline" role="status">
-          Recuerde actualizar las tarifas cada mes
-          {origenMesAnterior
-            ? ` · Lecturas anteriores tomadas de ${origenMesAnterior}`
-            : ""}
-        </p>
+        {mensajeWp ? (
+          <p className="aviso-tarifas aviso-tarifas-inline aviso-wp" role="status">
+            {mensajeWp}
+          </p>
+        ) : (
+          <p className="aviso-tarifas aviso-tarifas-inline" role="status">
+            Recuerde actualizar las tarifas cada mes
+            {origenMesAnterior
+              ? ` · Lecturas anteriores tomadas de ${origenMesAnterior}`
+              : ""}
+          </p>
+        )}
 
         {aviso && (
           <p className="aviso-advertencia" role="status">
@@ -821,7 +876,7 @@ export default function RegistroMensual({
           <table className="tabla tabla-registro">
             <thead>
               <tr>
-                <th>#</th>
+                <th className="col-num">#</th>
                 <th>Apartamento</th>
                 <th className="col-energia">Ant. Energía</th>
                 <th className="col-energia">Act. Energía</th>
@@ -832,6 +887,7 @@ export default function RegistroMensual({
                 <th className="col-agua">Cons. (m³)</th>
                 <th className="col-agua">Total Agua</th>
                 <th className="col-total">TOTAL A PAGAR</th>
+                <th className="col-compartir">Enviar</th>
               </tr>
             </thead>
             <tbody>
@@ -844,7 +900,7 @@ export default function RegistroMensual({
                       : undefined
                   }
                 >
-                  <td>{indice + 1}</td>
+                  <td className="col-num">{indice + 1}</td>
                   <td className="celda-nombre">{fila.nombre}</td>
                   <td className="col-energia">
                     <input
@@ -945,6 +1001,42 @@ export default function RegistroMensual({
                   <td className="col-total celda-calculada" title="Total a pagar por el apartamento, incluyendo energía, agua y tarifa fija.">
                     {formatearPesos(fila.calculos.totalAPagar)}
                   </td>
+                  <td className="col-compartir">
+                    {datosCompletos ? (
+                      <div className="celdas-compartir">
+                        <button
+                          type="button"
+                          className="btn-exportar-fila"
+                          onClick={() => descargarFilaComoImagen(datosResumen(fila))}
+                          title={`Descargar resumen de ${fila.nombre} en JPG`}
+                          aria-label={`Descargar resumen de ${fila.nombre} en JPG`}
+                        >
+                          ↓ JPG
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-exportar-fila btn-whatsapp"
+                          onClick={() =>
+                            compartirResumenPorWhatsApp({
+                              ...datosResumen(fila),
+                              telefono: apartamentos.find((a) => a.id === fila.apartamentoId)?.telefono,
+                              onMensaje: setMensajeWp,
+                            })
+                          }
+                          title={
+                            apartamentos.find((a) => a.id === fila.apartamentoId)?.telefono
+                              ? `Enviar resumen a ${fila.nombre} por WhatsApp`
+                              : `${fila.nombre} no tiene WhatsApp guardado; elija el contacto`
+                          }
+                          aria-label={`Enviar resumen de ${fila.nombre} por WhatsApp`}
+                        >
+                          WP
+                        </button>
+                      </div>
+                    ) : (
+                      <span title="Disponible cuando estén todos los valores ingresados.">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -958,6 +1050,7 @@ export default function RegistroMensual({
                 <td className="col-agua">{formatearConsumo(totales.consumoAgua)}</td>
                 <td className="col-agua">{formatearPesos(totales.costoAgua)}</td>
                 <td className="col-total">{formatearPesos(totales.totalAPagar)}</td>
+                <td className="col-compartir" />
               </tr>
             </tfoot>
           </table>
