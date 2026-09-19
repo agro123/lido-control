@@ -21,6 +21,15 @@ Si en Fedora/Wayland la ventana no abre (error de WebKit), pruebe:
 WEBKIT_DISABLE_DMABUF_RENDERER=1 GDK_BACKEND=x11 npm run tauri dev
 ```
 
+### Lectura de recibos con Gemini (opcional)
+
+El botón **Cargar recibo (PDF)** del registro mensual envía la primera página del PDF escaneado a la API de Gemini (Google AI Studio) y rellena los datos del recibo. Requiere configurar:
+
+1. Copie `.env.example` como `.env` (está en `.gitignore`, no se sube a git).
+2. Defina `GEMINI_API_KEY` (obtenida en <https://aistudio.google.com/apikey>) y, si quiere, `GEMINI_MODEL` (por defecto `gemini-2.5-flash-lite`).
+
+En una app instalada, coloque ese `.env` en el directorio de datos de la aplicación, junto a `data.json`. También se respetan las variables definidas en el entorno del sistema.
+
 ## Compilar
 
 ```bash

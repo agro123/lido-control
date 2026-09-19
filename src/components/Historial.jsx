@@ -354,7 +354,7 @@ function descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarif
   if (tarifaFija !== null && tarifaFija !== undefined && Number.isFinite(Number(tarifaFija))) {
     contexto.fillStyle = "#d9eaf7";
     contexto.font = "600 24px Arial, sans-serif";
-    contexto.fillText(`+ servicios básicos ${formatearPesos(tarifaFija)}`, 150, 1048);
+    contexto.fillText(`+ Otros servicios ${formatearPesos(tarifaFija)}`, 150, 1048);
   }
 
   contexto.fillStyle = "#66798b";

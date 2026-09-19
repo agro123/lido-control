@@ -1,3 +1,5 @@
+mod recibo;
+
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -59,7 +61,7 @@ async fn write_data(app: tauri::AppHandle, content: String) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![read_data, write_data])
+        .invoke_handler(tauri::generate_handler![read_data, write_data, recibo::extraer_datos_recibo, recibo::estado_uso_recibo])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

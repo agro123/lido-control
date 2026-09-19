@@ -7,6 +7,7 @@ import {
   calcularTarifaFija,
 } from "../helpers/calculos";
 import { obtenerMesAnioAnterior } from "../helpers/fechas";
+import { extraerDatosRecibo, obtenerUsoRecibo } from "../helpers/reciboPdf";
 import {
   aNumeroONull,
   formatearConsumo,
@@ -116,6 +117,8 @@ export default function RegistroMensual({
   const [aviso, setAviso] = useState("");
   const [exito, setExito] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [leyendoPdf, setLeyendoPdf] = useState(false);
+  const [usoPdf, setUsoPdf] = useState(null);
   const [origenMesAnterior, setOrigenMesAnterior] = useState(null);
   const tablaRef = useRef(null);
   const camposReciboRef = useRef(null);
@@ -169,6 +172,66 @@ export default function RegistroMensual({
     setTarifaEnergia(tarifas.tarifaEnergia == null ? "" : String(tarifas.tarifaEnergia));
     setTarifaAgua(tarifas.tarifaAgua == null ? "" : String(tarifas.tarifaAgua));
     setTarifaFija(tarifas.tarifaFija == null ? "" : String(tarifas.tarifaFija));
+  }
+
+  useEffect(() => {
+    obtenerUsoRecibo().then(setUsoPdf).catch(() => setUsoPdf(null));
+  }, []);
+
+  const limitePdfAlcanzado = usoPdf !== null && usoPdf.usados >= usoPdf.maximo;
+
+  /**
+   * Lee un recibo PDF con Gemini y rellena los campos del recibo (siguen siendo editables).
+   * @param {import('react').ChangeEvent<HTMLInputElement>} evento
+   */
+  async function manejarCargaPdf(evento) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+
+    setAviso("");
+    setExito("");
+    setLeyendoPdf(true);
+    try {
+      const datos = await extraerDatosRecibo(archivo);
+      const campos = [
+        ["Total energía", datos.totalEnergia, setTotalEnergiaRecibo, "totalEnergiaRecibo"],
+        ["Consumo energía", datos.consumoKwh, setConsumoKwh, "consumoKwh"],
+        ["Total acueducto", datos.totalAcueducto, setCostoAcueducto, "costoAcueducto"],
+        ["Total alcantarillado", datos.totalAlcantarillado, setCostoAlcantarillado, "costoAlcantarillado"],
+        ["Consumo agua", datos.consumoM3Agua, setConsumoM3Agua, "consumoM3Agua"],
+        ["Servicios varios", datos.serviciosVarios, setServiciosVarios, "serviciosVarios"],
+      ];
+
+      // Solo se reemplazan los campos que Gemini logró leer.
+      const encontrados = {};
+      const faltantes = [];
+      campos.forEach(([etiqueta, valor, asignar, clave]) => {
+        if (valor === null || valor === undefined) {
+          faltantes.push(etiqueta);
+          return;
+        }
+        asignar(String(valor));
+        encontrados[clave] = String(valor);
+      });
+      actualizarTarifasDesdeRecibo(encontrados);
+
+      if (faltantes.length === campos.length) {
+        setAviso("No se encontraron datos en el PDF. Verifique que sea el recibo correcto.");
+      } else {
+        setExito("Datos leídos del recibo. Revíselos antes de guardar.");
+        if (faltantes.length > 0) {
+          setAviso(`No se pudo leer: ${faltantes.join(", ")}. Complételos a mano.`);
+        }
+      }
+    } catch (err) {
+      setAviso(
+        `No se pudo leer el recibo: ${typeof err === "string" ? err : err?.message || "error desconocido"}`,
+      );
+    } finally {
+      setLeyendoPdf(false);
+      obtenerUsoRecibo().then(setUsoPdf).catch(() => {});
+    }
   }
 
   /**
@@ -578,6 +641,28 @@ export default function RegistroMensual({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label
+            className={`btn btn-secundario carga-recibo${leyendoPdf || limitePdfAlcanzado ? " btn-deshabilitado" : ""}`}
+            title={
+              limitePdfAlcanzado
+                ? "Se alcanzó el máximo de lecturas de recibo de este mes. Ingrese los datos a mano."
+                : "Rellena los datos del recibo desde la primera página del PDF."
+            }
+          >
+            {leyendoPdf
+              ? "Leyendo recibo…"
+              : limitePdfAlcanzado
+                ? `Límite del mes alcanzado (${usoPdf.usados}/${usoPdf.maximo})`
+                : `Cargar recibo (PDF)${usoPdf ? ` · ${usoPdf.usados}/${usoPdf.maximo}` : ""}`}
+            <input
+              type="file"
+              accept="application/pdf"
+              hidden
+              disabled={leyendoPdf || limitePdfAlcanzado}
+              onChange={manejarCargaPdf}
+            />
           </label>
 
           <div

@@ -352,7 +352,7 @@ button {
 
 .form-fila-registro-periodo {
   display: grid;
-  grid-template-columns: 140px 110px minmax(0, 1fr);
+  grid-template-columns: 140px 110px auto minmax(0, 1fr);
   gap: 8px;
   align-items: end;
   margin-bottom: 4px;
@@ -499,6 +499,16 @@ button {
   font-size: 13px;
   font-weight: 700;
   color: #5d4037;
+}
+
+.carga-recibo {
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-deshabilitado {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .aviso-tarifas-inline {
@@ -1386,6 +1396,7 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 
+  .form-fila-registro-periodo .carga-recibo,
   .form-fila-registro-periodo .fecha-actual {
     grid-column: 1 / -1;
   }
