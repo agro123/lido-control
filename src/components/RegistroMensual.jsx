@@ -9,6 +9,7 @@ import {
 import { obtenerMesAnioAnterior } from "../helpers/fechas";
 import { extraerDatosRecibo, obtenerUsoRecibo } from "../helpers/reciboPdf";
 import { compartirResumenPorWhatsApp, descargarFilaComoImagen } from "../helpers/resumenImagen";
+import { mostrarError, mostrarExito } from "../hooks/useToast";
 import {
   aNumeroONull,
   formatearConsumo,
@@ -116,11 +117,9 @@ export default function RegistroMensual({
   const [filas, setFilas] = useState([]);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState("");
-  const [exito, setExito] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [leyendoPdf, setLeyendoPdf] = useState(false);
   const [usoPdf, setUsoPdf] = useState(null);
-  const [mensajeWp, setMensajeWp] = useState("");
   const [origenMesAnterior, setOrigenMesAnterior] = useState(null);
   const tablaRef = useRef(null);
   const camposReciboRef = useRef(null);
@@ -180,13 +179,6 @@ export default function RegistroMensual({
     obtenerUsoRecibo().then(setUsoPdf).catch(() => setUsoPdf(null));
   }, []);
 
-  /** El mensaje de WhatsApp reemplaza el recordatorio de tarifas durante unos segundos. */
-  useEffect(() => {
-    if (!mensajeWp) return undefined;
-    const temporizador = setTimeout(() => setMensajeWp(""), 15000);
-    return () => clearTimeout(temporizador);
-  }, [mensajeWp]);
-
   const limitePdfAlcanzado = usoPdf !== null && usoPdf.usados >= usoPdf.maximo;
 
   /**
@@ -199,7 +191,6 @@ export default function RegistroMensual({
     if (!archivo) return;
 
     setAviso("");
-    setExito("");
     setLeyendoPdf(true);
     try {
       const datos = await extraerDatosRecibo(archivo);
@@ -228,13 +219,13 @@ export default function RegistroMensual({
       if (faltantes.length === campos.length) {
         setAviso("No se encontraron datos en el PDF. Verifique que sea el recibo correcto.");
       } else {
-        setExito("Datos leídos del recibo. Revíselos antes de guardar.");
+        mostrarExito("Datos leídos del recibo. Revíselos antes de guardar.");
         if (faltantes.length > 0) {
           setAviso(`No se pudo leer: ${faltantes.join(", ")}. Complételos a mano.`);
         }
       }
     } catch (err) {
-      setAviso(
+      mostrarError(
         `No se pudo leer el recibo: ${typeof err === "string" ? err : err?.message || "error desconocido"}`,
       );
     } finally {
@@ -311,7 +302,6 @@ export default function RegistroMensual({
 
     setErrores({});
     setAviso("");
-    setExito("");
   }
 
   /**
@@ -351,13 +341,11 @@ export default function RegistroMensual({
   /** Cambia el mes sin borrar tarifas ni lecturas ya digitadas. */
   function cambiarMes(nuevoMes) {
     setMes(nuevoMes);
-    setExito("");
   }
 
   /** Cambia el año sin borrar tarifas ni lecturas ya digitadas. */
   function cambiarAnio(nuevoAnio) {
     setAnio(Number(nuevoAnio));
-    setExito("");
   }
 
   const tarifas = useMemo(
@@ -414,7 +402,6 @@ export default function RegistroMensual({
       },
       calculos: fila.calculos,
       tarifaFija: aNumeroONull(tarifaFija) ?? 0,
-      onMensaje: setExito,
     };
   }
 
@@ -454,7 +441,6 @@ export default function RegistroMensual({
         fila.apartamentoId === apartamentoId ? { ...fila, [campo]: limpio } : fila,
       ),
     );
-    setExito("");
   }
 
   /**
@@ -552,7 +538,6 @@ export default function RegistroMensual({
 
   /** Guarda el registro, preguntando si ya existe uno para el mismo mes/año. */
   async function manejarGuardar() {
-    setExito("");
     if (!validar()) {
       return;
     }
@@ -578,9 +563,11 @@ export default function RegistroMensual({
       }
 
       if (resultado.ok) {
-        setExito(`Registro de ${mes} ${anio} guardado correctamente.`);
+        mostrarExito(`Registro de ${mes} ${anio} guardado correctamente.`);
         setErrores({});
         setOrigenMesAnterior(null);
+      } else {
+        mostrarError("No se pudo guardar el registro. Intente de nuevo.");
       }
     } finally {
       setGuardando(false);
@@ -623,8 +610,24 @@ export default function RegistroMensual({
     );
     setErrores({});
     setAviso("");
-    setExito("");
   }
+
+  /** Mensaje único mostrado junto a mes/año: validación > avisos del recibo > recordatorio. */
+  const filaConLecturaInvalida = filasCalculadas.some(
+    (f) => f.calculos.energiaInvalida || f.calculos.aguaInvalida,
+  );
+  const faltanCampos = !filaConLecturaInvalida && Object.keys(errores).length > 0;
+  const mensajeValidacion = filaConLecturaInvalida
+    ? "La lectura actual no puede ser menor que la anterior. Corrija las filas en rojo."
+    : faltanCampos
+      ? "Complete todos los campos de lecturas antes de guardar."
+      : null;
+  const mensajeAyuda =
+    mensajeValidacion ||
+    aviso ||
+    `Recuerde actualizar las tarifas cada mes${
+      origenMesAnterior ? ` · Lecturas anteriores tomadas de ${origenMesAnterior}` : ""
+    }`;
 
   return (
     <section className="pagina pagina-registro">
@@ -851,24 +854,12 @@ export default function RegistroMensual({
           </div>
         </div>
 
-        {mensajeWp ? (
-          <p className="aviso-tarifas aviso-tarifas-inline aviso-wp" role="status">
-            {mensajeWp}
-          </p>
-        ) : (
-          <p className="aviso-tarifas aviso-tarifas-inline" role="status">
-            Recuerde actualizar las tarifas cada mes
-            {origenMesAnterior
-              ? ` · Lecturas anteriores tomadas de ${origenMesAnterior}`
-              : ""}
-          </p>
-        )}
-
-        {aviso && (
-          <p className="aviso-advertencia" role="status">
-            {aviso}
-          </p>
-        )}
+        <p
+          className={`aviso-tarifas aviso-tarifas-inline${mensajeValidacion ? " aviso-tarifas-error" : ""}`}
+          role={mensajeValidacion ? "alert" : "status"}
+        >
+          {mensajeAyuda}
+        </p>
       </div>
 
       <div className="tarjeta tarjeta-tabla">
@@ -1020,7 +1011,6 @@ export default function RegistroMensual({
                             compartirResumenPorWhatsApp({
                               ...datosResumen(fila),
                               telefono: apartamentos.find((a) => a.id === fila.apartamentoId)?.telefono,
-                              onMensaje: setMensajeWp,
                             })
                           }
                           title={
@@ -1055,30 +1045,7 @@ export default function RegistroMensual({
             </tfoot>
           </table>
         </div>
-
-        {filasCalculadas.some(
-          (f) => f.calculos.energiaInvalida || f.calculos.aguaInvalida,
-        ) && (
-          <p className="campo-error aviso-fila" role="alert">
-            La lectura actual no puede ser menor que la anterior. Corrija las filas en rojo.
-          </p>
-        )}
-
-        {Object.keys(errores).length > 0 &&
-          !filasCalculadas.some(
-            (f) => f.calculos.energiaInvalida || f.calculos.aguaInvalida,
-          ) && (
-            <p className="campo-error aviso-fila" role="alert">
-              Complete todos los campos de lecturas antes de guardar.
-            </p>
-          )}
       </div>
-
-      {exito && (
-        <p className="mensaje-exito" role="status">
-          {exito}
-        </p>
-      )}
     </section>
   );
 }

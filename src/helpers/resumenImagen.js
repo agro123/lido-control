@@ -1,4 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { mostrarError, mostrarExito } from "../hooks/useToast";
 import { formatearConsumo, formatearPesos } from "./formato";
 
 function rectanguloRedondeado(contexto, x, y, ancho, alto, radio) {
@@ -108,20 +109,25 @@ function canvasABlob(canvas, tipo, calidad) {
 
 /**
  * Descarga el resumen de un apartamento como JPG.
- * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number, onMensaje?: (texto: string) => void }} datos
+ * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number }} datos
  */
-export async function descargarFilaComoImagen({ onMensaje = () => {}, ...datos }) {
-  const canvas = crearCanvasResumen(datos);
-  if (!canvas) return;
-  const archivo = await canvasABlob(canvas, "image/jpeg", 0.96);
-  const enlace = document.createElement("a");
-  enlace.href = URL.createObjectURL(archivo);
-  enlace.download = `${nombreBaseArchivo(datos)}.jpg`;
-  document.body.appendChild(enlace);
-  enlace.click();
-  enlace.remove();
-  URL.revokeObjectURL(enlace.href);
-  onMensaje("Imagen guardada en descargas");
+export async function descargarFilaComoImagen(datos) {
+  try {
+    const canvas = crearCanvasResumen(datos);
+    if (!canvas) return;
+    const archivo = await canvasABlob(canvas, "image/jpeg", 0.96);
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(archivo);
+    enlace.download = `${nombreBaseArchivo(datos)}.jpg`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(enlace.href);
+    mostrarExito("Imagen guardada en descargas.");
+  } catch (error) {
+    console.error("No se pudo generar la imagen del resumen:", error);
+    mostrarError("No se pudo generar la imagen del resumen.");
+  }
 }
 
 /**
@@ -153,9 +159,9 @@ async function abrirWhatsApp(telefono) {
  * Copia el resumen como imagen al portapapeles y abre WhatsApp para pegarla (Ctrl+V).
  * WhatsApp no permite adjuntar archivos desde un enlace, por eso el usuario pega la imagen.
  * Si no se puede copiar, descarga la imagen para adjuntarla a mano.
- * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number, telefono?: string|null, onMensaje?: (texto: string) => void }} datos
+ * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number, telefono?: string|null }} datos
  */
-export async function compartirResumenPorWhatsApp({ telefono, onMensaje = () => {}, ...datos }) {
+export async function compartirResumenPorWhatsApp({ telefono, ...datos }) {
   const canvas = crearCanvasResumen(datos);
   if (!canvas) return;
   const numero = normalizarCelularColombia(telefono);
@@ -169,19 +175,19 @@ export async function compartirResumenPorWhatsApp({ telefono, onMensaje = () => 
     copiada = true;
   } catch (error) {
     console.error("No se pudo copiar la imagen:", error);
-    await descargarFilaComoImagen({ ...datos });
+    await descargarFilaComoImagen(datos);
   }
 
   try {
     await abrirWhatsApp(numero);
   } catch (error) {
     console.error("No se pudo abrir WhatsApp:", error);
-    onMensaje("No se pudo abrir WhatsApp. Ábralo manualmente y adjunte la imagen.");
+    mostrarError("No se pudo abrir WhatsApp. Ábralo manualmente y adjunte la imagen.");
     return;
   }
 
   const destino = numero ? `el chat de ${datos.nombre}` : "el contacto de su elección";
-  onMensaje(
+  mostrarExito(
     copiada
       ? `Imagen copiada. En WhatsApp abra ${destino} y presione Ctrl+V para pegarla.`
       : `WhatsApp abierto. La imagen se descargó: adjúntela en ${destino}.`,

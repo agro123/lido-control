@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import RegistroMensual from "./components/RegistroMensual";
 import Historial from "./components/Historial";
 import ConfigApartamentos from "./components/ConfigApartamentos";
+import Toast from "./components/Toast";
 import { useData } from "./hooks/useData";
 import { VISTAS } from "./helpers/constantes";
 import "./styles/global.css";
@@ -33,6 +34,7 @@ function App() {
 
   return (
     <div className={`layout${menuColapsado ? " layout-menu-colapsado" : ""}`}>
+      <Toast />
       <Sidebar
         vistaActiva={vistaActiva}
         onCambiarVista={setVistaActiva}

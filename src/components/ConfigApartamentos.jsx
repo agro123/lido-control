@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { normalizarInputNumerico } from "../helpers/formato";
+import { mostrarError, mostrarExito } from "../hooks/useToast";
 
 /** Un celular colombiano: 10 dígitos que empiezan por 3. Vacío es válido (WhatsApp sin número). */
 function celularValido(texto) {
@@ -17,14 +18,12 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
   const [nombreEdicion, setNombreEdicion] = useState("");
   const [telefonoNuevo, setTelefonoNuevo] = useState("");
   const [telefonoEdicion, setTelefonoEdicion] = useState("");
-  const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
 
   /** Agrega un apartamento con solo el nombre. */
   async function manejarAgregar(evento) {
     evento.preventDefault();
     setError("");
-    setMensaje("");
 
     const nombre = nombreNuevo.trim();
     if (!nombre) {
@@ -46,9 +45,9 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
     if (ok) {
       setNombreNuevo("");
       setTelefonoNuevo("");
-      setMensaje(`Apartamento "${nombre}" agregado.`);
+      mostrarExito(`Apartamento "${nombre}" agregado.`);
     } else {
-      setError("No se pudo agregar el apartamento.");
+      mostrarError("No se pudo agregar el apartamento.");
     }
   }
 
@@ -58,7 +57,6 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
     setNombreEdicion(apto.nombre);
     setTelefonoEdicion(apto.telefono || "");
     setError("");
-    setMensaje("");
   }
 
   /** Guarda el nuevo nombre del apartamento en edición. */
@@ -84,9 +82,9 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
       setEditandoId(null);
       setNombreEdicion("");
       setTelefonoEdicion("");
-      setMensaje("Apartamento actualizado.");
+      mostrarExito("Apartamento actualizado.");
     } else {
-      setError("No se pudo actualizar el apartamento.");
+      mostrarError("No se pudo actualizar el apartamento.");
     }
   }
 
@@ -102,18 +100,18 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
 
     const actualizados = apartamentos.filter((a) => a.id !== apto.id);
     if (actualizados.length === 0) {
-      setError("Debe quedar al menos un apartamento.");
+      mostrarError("Debe quedar al menos un apartamento.");
       return;
     }
 
     const ok = await guardarApartamentos(actualizados, [apto.id]);
     if (ok) {
-      setMensaje(`Apartamento "${apto.nombre}" eliminado.`);
+      mostrarExito(`Apartamento "${apto.nombre}" eliminado.`);
       if (editandoId === apto.id) {
         setEditandoId(null);
       }
     } else {
-      setError("No se pudo eliminar el apartamento.");
+      mostrarError("No se pudo eliminar el apartamento.");
     }
   }
 
@@ -157,11 +155,6 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
         {error && (
           <p className="campo-error" role="alert">
             {error}
-          </p>
-        )}
-        {mensaje && (
-          <p className="mensaje-exito" role="status">
-            {mensaje}
           </p>
         )}
       </div>
