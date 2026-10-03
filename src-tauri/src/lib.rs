@@ -12,7 +12,8 @@ const DATA_INICIAL: &str = r#"{
     { "id": 3, "nombre": "Apto Jeferson" },
     { "id": 4, "nombre": "Apto Edison" }
   ],
-  "registros": []
+  "registros": [],
+  "telefonoDueno": null
 }"#;
 
 /// Obtiene la ruta completa de data.json dentro del directorio de datos de la app.

@@ -8,7 +8,13 @@ import {
 } from "../helpers/calculos";
 import { obtenerMesAnioAnterior } from "../helpers/fechas";
 import { extraerDatosRecibo, obtenerUsoRecibo } from "../helpers/reciboPdf";
-import { compartirResumenPorWhatsApp, descargarFilaComoImagen } from "../helpers/resumenImagen";
+import {
+  compartirResumenEdificioPorWhatsApp,
+  compartirResumenPorWhatsApp,
+  construirResumenEdificio,
+  descargarFilaComoImagen,
+  descargarResumenEdificioComoImagen,
+} from "../helpers/resumenImagen";
 import { mostrarError, mostrarExito } from "../hooks/useToast";
 import {
   aNumeroONull,
@@ -101,6 +107,7 @@ export default function RegistroMensual({
   apartamentos,
   buscarRegistro,
   guardarRegistro,
+  telefonoDueno,
 }) {
   const inicial = obtenerMesAnioActual();
   const [mes, setMes] = useState(inicial.mes);
@@ -403,6 +410,24 @@ export default function RegistroMensual({
       calculos: fila.calculos,
       tarifaFija: aNumeroONull(tarifaFija) ?? 0,
     };
+  }
+
+  /** Registro guardado del mes anterior, para comparar el resumen del edificio. */
+  const registroAnteriorEdificio = useMemo(() => {
+    const ref = obtenerMesAnioAnterior(mes, anio);
+    return ref ? buscarRegistro(ref.mes, ref.anio) : null;
+  }, [mes, anio, buscarRegistro]);
+
+  /** Datos de todo el edificio en el formato que usa la imagen-resumen para el dueño. */
+  function datosResumenEdificio() {
+    return construirResumenEdificio({
+      periodo: `${mes} ${anio}`,
+      filas: filasCalculadas,
+      tarifaEnergia,
+      tarifaAgua,
+      tarifaFija,
+      registroAnterior: registroAnteriorEdificio,
+    });
   }
 
   /** Totales de la fila inferior. */
@@ -1040,7 +1065,39 @@ export default function RegistroMensual({
                 <td className="col-agua">{formatearConsumo(totales.consumoAgua)}</td>
                 <td className="col-agua">{formatearPesos(totales.costoAgua)}</td>
                 <td className="col-total">{formatearPesos(totales.totalAPagar)}</td>
-                <td className="col-compartir" />
+                <td className="col-compartir">
+                  {datosCompletos && (
+                    <div className="celdas-compartir">
+                      <button
+                        type="button"
+                        className="btn-exportar-fila"
+                        onClick={() => descargarResumenEdificioComoImagen(datosResumenEdificio())}
+                        title="Descargar resumen de todo el edificio en JPG"
+                        aria-label="Descargar resumen de todo el edificio en JPG"
+                      >
+                        ↓ JPG
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-exportar-fila btn-whatsapp"
+                        onClick={() =>
+                          compartirResumenEdificioPorWhatsApp({
+                            ...datosResumenEdificio(),
+                            telefonoDueno,
+                          })
+                        }
+                        title={
+                          telefonoDueno
+                            ? "Enviar resumen del edificio al dueño por WhatsApp"
+                            : "Enviar resumen del edificio por WhatsApp (configure el número del dueño en Apartamentos)"
+                        }
+                        aria-label="Enviar resumen del edificio por WhatsApp"
+                      >
+                        WP
+                      </button>
+                    </div>
+                  )}
+                </td>
               </tr>
             </tfoot>
           </table>

@@ -12,13 +12,38 @@ const MENSAJE_CELULAR = "El WhatsApp debe tener 10 dígitos y empezar por 3 (ej:
 /**
  * Configuración de apartamentos: listar, agregar, renombrar y eliminar.
  */
-export default function ConfigApartamentos({ apartamentos, guardarApartamentos }) {
+export default function ConfigApartamentos({
+  apartamentos,
+  guardarApartamentos,
+  telefonoDueno,
+  guardarTelefonoDueno,
+}) {
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [nombreEdicion, setNombreEdicion] = useState("");
   const [telefonoNuevo, setTelefonoNuevo] = useState("");
   const [telefonoEdicion, setTelefonoEdicion] = useState("");
+  const [telefonoDuenoInput, setTelefonoDuenoInput] = useState(telefonoDueno || "");
+  const [errorDueno, setErrorDueno] = useState("");
+  const [guardandoDueno, setGuardandoDueno] = useState(false);
   const [error, setError] = useState("");
+
+  /** Guarda el número de WhatsApp del dueño del edificio. */
+  async function manejarGuardarDueno(evento) {
+    evento.preventDefault();
+    setErrorDueno("");
+
+    if (!celularValido(telefonoDuenoInput)) {
+      setErrorDueno(MENSAJE_CELULAR);
+      return;
+    }
+
+    setGuardandoDueno(true);
+    const ok = await guardarTelefonoDueno(telefonoDuenoInput);
+    setGuardandoDueno(false);
+    if (ok) mostrarExito("Número del dueño guardado.");
+    else mostrarError("No se pudo guardar el número del dueño.");
+  }
 
   /** Agrega un apartamento con solo el nombre. */
   async function manejarAgregar(evento) {
@@ -121,6 +146,36 @@ export default function ConfigApartamentos({ apartamentos, guardarApartamentos }
         <h2>Configuración de Apartamentos</h2>
         <p>Agregue, edite (nombre y WhatsApp) o elimine apartamentos del edificio.</p>
       </header>
+
+      <div className="tarjeta">
+        <h3 className="seccion-titulo">Dueño del edificio</h3>
+        <p className="texto-ayuda">
+          A este número de WhatsApp se envía el resumen mensual de todo el edificio.
+        </p>
+        <form className="form-fila form-dueno" onSubmit={manejarGuardarDueno}>
+          <label className="campo">
+            <span className="campo-etiqueta">WhatsApp del dueño</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={telefonoDuenoInput}
+              onChange={(e) => setTelefonoDuenoInput(normalizarInputNumerico(e.target.value).slice(0, 10))}
+              placeholder="3001234567"
+            />
+          </label>
+          <div className="campo campo-accion">
+            <span className="campo-etiqueta campo-etiqueta-invisible">Acción</span>
+            <button type="submit" className="btn btn-primario" disabled={guardandoDueno}>
+              {guardandoDueno ? "Guardando…" : "Guardar número"}
+            </button>
+          </div>
+        </form>
+        {errorDueno && (
+          <p className="campo-error" role="alert">
+            {errorDueno}
+          </p>
+        )}
+      </div>
 
       <div className="tarjeta">
         <h3 className="seccion-titulo">Agregar apartamento</h3>

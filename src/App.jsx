@@ -21,6 +21,7 @@ function App() {
     guardarRegistro,
     eliminarRegistro,
     guardarApartamentos,
+    guardarTelefonoDueno,
     buscarRegistro,
   } = useData();
 
@@ -54,6 +55,7 @@ function App() {
             apartamentos={datos.apartamentos}
             buscarRegistro={buscarRegistro}
             guardarRegistro={guardarRegistro}
+            telefonoDueno={datos.telefonoDueno}
           />
         )}
 
@@ -63,6 +65,7 @@ function App() {
             apartamentos={datos.apartamentos}
             eliminarRegistro={eliminarRegistro}
             guardarRegistro={guardarRegistro}
+            telefonoDueno={datos.telefonoDueno}
           />
         )}
 
@@ -70,6 +73,8 @@ function App() {
           <ConfigApartamentos
             apartamentos={datos.apartamentos}
             guardarApartamentos={guardarApartamentos}
+            telefonoDueno={datos.telefonoDueno}
+            guardarTelefonoDueno={guardarTelefonoDueno}
           />
         )}
       </main>

@@ -193,3 +193,410 @@ export async function compartirResumenPorWhatsApp({ telefono, ...datos }) {
       : `WhatsApp abierto. La imagen se descargó: adjúntela en ${destino}.`,
   );
 }
+
+/* ---------- Resumen de todo el edificio (para el dueño) ---------- */
+
+/** Compara dos números: 1 si subió, -1 si bajó, 0 si quedó igual o no son válidos. */
+function signoCambio(actual, anterior) {
+  if (!Number.isFinite(actual) || !Number.isFinite(anterior)) return 0;
+  if (actual > anterior) return 1;
+  if (actual < anterior) return -1;
+  return 0;
+}
+
+function formatearPorcentaje(porcentaje) {
+  const texto = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(
+    Math.abs(porcentaje),
+  );
+  return `${texto}%`;
+}
+
+function listarConY(items) {
+  if (items.length === 1) return items[0];
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+/**
+ * Suma las cifras de todos los apartamentos para un conjunto de filas ya calculadas.
+ * @param {{ filas: Array<{ calculos: object }>, tarifaEnergia: *, tarifaAgua: *, tarifaFija: * }} datos
+ */
+function resumirEdificioDesdeFilas({ filas, tarifaEnergia, tarifaAgua, tarifaFija }) {
+  const consumoEnergia = filas.reduce((acc, f) => acc + (Number(f.calculos.consumoEnergia) || 0), 0);
+  const costoEnergia = filas.reduce((acc, f) => acc + (Number(f.calculos.costoEnergia) || 0), 0);
+  const consumoAgua = filas.reduce((acc, f) => acc + (Number(f.calculos.consumoAgua) || 0), 0);
+  const costoAgua = filas.reduce((acc, f) => acc + (Number(f.calculos.costoAgua) || 0), 0);
+  const totalServiciosVarios = (Number(tarifaFija) || 0) * filas.length;
+  return {
+    consumoEnergia,
+    costoEnergia,
+    tarifaEnergia: Number(tarifaEnergia) || 0,
+    consumoAgua,
+    costoAgua,
+    tarifaAgua: Number(tarifaAgua) || 0,
+    totalServiciosVarios,
+    totalAPagar: costoEnergia + costoAgua + totalServiciosVarios,
+  };
+}
+
+/** Igual que `resumirEdificioDesdeFilas`, pero a partir de un registro ya guardado (mes anterior). */
+function resumirEdificioDesdeRegistro(registro) {
+  if (!registro || !(registro.apartamentos || []).length) return null;
+  const filas = registro.apartamentos.map((apto) => ({
+    calculos: {
+      consumoEnergia: apto.energia?.consumo,
+      costoEnergia: apto.energia?.costo,
+      consumoAgua: apto.agua?.consumo,
+      costoAgua: apto.agua?.costo,
+    },
+  }));
+  return resumirEdificioDesdeFilas({
+    filas,
+    tarifaEnergia: registro.tarifaEnergia,
+    tarifaAgua: registro.tarifaAgua,
+    tarifaFija: registro.tarifaFija,
+  });
+}
+
+/**
+ * Explica, en una frase, por qué subió o bajó el costo total frente al mes anterior.
+ * Considera cada variable por separado: consumo y precio de energía, consumo y precio de
+ * agua, y servicios varios. Solo menciona las que se movieron en la misma dirección que el total.
+ */
+function construirComparacionEdificio(actual, anterior) {
+  if (!anterior || !anterior.totalAPagar) return null;
+
+  const direccion = signoCambio(actual.totalAPagar, anterior.totalAPagar);
+  const porcentaje =
+    ((actual.totalAPagar - anterior.totalAPagar) / Math.abs(anterior.totalAPagar)) * 100;
+
+  if (direccion === 0) {
+    return { porcentaje: 0, texto: "El costo total del edificio se mantuvo igual al mes anterior." };
+  }
+
+  const factores = [
+    [signoCambio(actual.consumoEnergia, anterior.consumoEnergia), "el consumo de energía aumentó", "el consumo de energía disminuyó"],
+    [signoCambio(actual.tarifaEnergia, anterior.tarifaEnergia), "el precio de la energía aumentó", "el precio de la energía disminuyó"],
+    [signoCambio(actual.consumoAgua, anterior.consumoAgua), "el consumo de agua aumentó", "el consumo de agua disminuyó"],
+    [signoCambio(actual.tarifaAgua, anterior.tarifaAgua), "el precio del agua aumentó", "el precio del agua disminuyó"],
+    [signoCambio(actual.totalServiciosVarios, anterior.totalServiciosVarios), "los servicios varios aumentaron", "los servicios varios disminuyeron"],
+  ];
+
+  const razones = factores
+    .filter(([signo]) => signo === direccion)
+    .map(([, sube, baja]) => (direccion > 0 ? sube : baja));
+
+  const frase = direccion > 0 ? "un aumento" : "una disminución";
+  const porcentajeTexto = formatearPorcentaje(porcentaje);
+
+  const texto =
+    razones.length === 0
+      ? `Hubo ${frase} del ${porcentajeTexto} en el costo total frente al mes anterior.`
+      : `Hubo ${frase} del ${porcentajeTexto} en el costo total porque ${listarConY(razones)}.`;
+
+  return { porcentaje, texto };
+}
+
+/**
+ * Construye los datos de la imagen-resumen de todo el edificio, comparando con el mes
+ * anterior cuando existe.
+ * @param {{ periodo: string, filas: Array<{ nombre: string, calculos: object, totalAPagar?: * }>,
+ *   tarifaEnergia: *, tarifaAgua: *, tarifaFija: *, registroAnterior?: object|null }} datos
+ */
+export function construirResumenEdificio({ periodo, filas, tarifaEnergia, tarifaAgua, tarifaFija, registroAnterior }) {
+  const actual = resumirEdificioDesdeFilas({ filas, tarifaEnergia, tarifaAgua, tarifaFija });
+  const anterior = resumirEdificioDesdeRegistro(registroAnterior);
+
+  return {
+    periodo,
+    filas: filas.map((f) => ({
+      nombre: f.nombre,
+      consumoEnergia: f.calculos.consumoEnergia ?? 0,
+      costoEnergia: f.calculos.costoEnergia ?? 0,
+      consumoAgua: f.calculos.consumoAgua ?? 0,
+      costoAgua: f.calculos.costoAgua ?? 0,
+      totalAPagar: (f.totalAPagar ?? f.calculos.totalAPagar) || 0,
+    })),
+    totalServiciosVarios: actual.totalServiciosVarios,
+    totalAPagar: actual.totalAPagar,
+    comparacion: anterior ? construirComparacionEdificio(actual, anterior) : null,
+  };
+}
+
+/** Separa un texto en líneas que no superen `anchoMaximo` con la fuente ya puesta en `contexto`. */
+function envolverTexto(contexto, texto, anchoMaximo) {
+  const palabras = texto.split(" ");
+  const lineas = [];
+  let actual = "";
+  palabras.forEach((palabra) => {
+    const prueba = actual ? `${actual} ${palabra}` : palabra;
+    if (actual && contexto.measureText(prueba).width > anchoMaximo) {
+      lineas.push(actual);
+      actual = palabra;
+    } else {
+      actual = prueba;
+    }
+  });
+  if (actual) lineas.push(actual);
+  return lineas;
+}
+
+const ANCHO_CANVAS_EDIFICIO = 1800;
+const MARGEN_X_EDIFICIO = 90;
+const ALTURA_CABECERA_EDIFICIO = 195;
+const ESPACIO_TRAS_CABECERA = 40;
+const ALTURA_ENCABEZADO_TABLA = 56;
+const ALTURA_FILA_EDIFICIO = 58;
+const ESPACIO_TRAS_TABLA = 26;
+const ALTURA_NOTA_SERVICIOS = 50;
+const ALTURA_CAJA_TOTAL_EDIFICIO = 220;
+const ESPACIO_TRAS_CAJA = 20;
+const ALTURA_LINEA_EXPLICACION = 36;
+const ESPACIO_SUPERIOR_EXPLICACION = 34;
+const ALTURA_FOOTER_EDIFICIO = 60;
+
+/** Columnas de la tabla por apartamento (ancho en px; sumadas dan el ancho del contenido). */
+function columnasTablaEdificio() {
+  const anchoContenido = ANCHO_CANVAS_EDIFICIO - MARGEN_X_EDIFICIO * 2;
+  const anchos = [420, 190, 260, 170, 260, 320];
+  let x = MARGEN_X_EDIFICIO;
+  const titulos = ["Apartamento", "Energía (kWh)", "Costo energía", "Agua (m³)", "Costo agua", "Total apto."];
+  const columnas = anchos.map((ancho, indice) => {
+    const columna = { x, ancho, titulo: titulos[indice], alinear: indice === 0 ? "left" : "right" };
+    x += ancho;
+    return columna;
+  });
+  return { columnas, anchoContenido };
+}
+
+function dibujarFilaTablaEdificio(ctx, columnas, y, altura, valores) {
+  const padding = 18;
+  columnas.forEach((columna, indice) => {
+    ctx.textAlign = columna.alinear;
+    const x = columna.alinear === "left" ? columna.x + padding : columna.x + columna.ancho - padding;
+    ctx.fillText(String(valores[indice]), x, y + altura / 2 + 9);
+  });
+  ctx.textAlign = "left";
+}
+
+/**
+ * Dibuja el resumen de todo el edificio (todos los apartamentos) en un canvas.
+ * @param {{ periodo: string, filas: Array, totalServiciosVarios: number, totalAPagar: number,
+ *   comparacion: { porcentaje: number, texto: string } | null }} datos
+ * @returns {HTMLCanvasElement|null}
+ */
+function crearCanvasResumenEdificio({ periodo, filas, totalServiciosVarios, totalAPagar, comparacion }) {
+  const { columnas, anchoContenido } = columnasTablaEdificio();
+  const alturaTabla = ALTURA_ENCABEZADO_TABLA + (filas.length + 1) * ALTURA_FILA_EDIFICIO;
+
+  const medidor = document.createElement("canvas").getContext("2d");
+  medidor.font = "500 26px Arial, sans-serif";
+  const lineasExplicacion = comparacion
+    ? envolverTexto(medidor, comparacion.texto, anchoContenido - 10)
+    : [];
+  const alturaExplicacion = lineasExplicacion.length
+    ? ESPACIO_SUPERIOR_EXPLICACION + lineasExplicacion.length * ALTURA_LINEA_EXPLICACION + 10
+    : 0;
+
+  const alturaCanvas =
+    ALTURA_CABECERA_EDIFICIO +
+    ESPACIO_TRAS_CABECERA +
+    alturaTabla +
+    ESPACIO_TRAS_TABLA +
+    ALTURA_NOTA_SERVICIOS +
+    ALTURA_CAJA_TOTAL_EDIFICIO +
+    ESPACIO_TRAS_CAJA +
+    alturaExplicacion +
+    ALTURA_FOOTER_EDIFICIO;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = ANCHO_CANVAS_EDIFICIO;
+  canvas.height = alturaCanvas;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.fillStyle = "#eef3f8";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Encabezado
+  ctx.fillStyle = "#1d4f7a";
+  ctx.fillRect(0, 0, canvas.width, ALTURA_CABECERA_EDIFICIO);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 50px Arial, sans-serif";
+  ctx.fillText("Resumen servicios públicos", MARGEN_X_EDIFICIO, 85);
+  ctx.font = "400 28px Arial, sans-serif";
+  ctx.fillText(periodo, MARGEN_X_EDIFICIO, 140);
+  ctx.font = "400 23px Arial, sans-serif";
+  ctx.fillText(`${filas.length} apartamento(s)`, MARGEN_X_EDIFICIO, 178);
+
+  let y = ALTURA_CABECERA_EDIFICIO + ESPACIO_TRAS_CABECERA;
+  const inicioTabla = y;
+
+  // Encabezado de la tabla
+  ctx.fillStyle = "#1d4f7a";
+  ctx.fillRect(MARGEN_X_EDIFICIO, y, anchoContenido, ALTURA_ENCABEZADO_TABLA);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 24px Arial, sans-serif";
+  dibujarFilaTablaEdificio(ctx, columnas, y, ALTURA_ENCABEZADO_TABLA, columnas.map((c) => c.titulo));
+  y += ALTURA_ENCABEZADO_TABLA;
+
+  // Filas de apartamentos
+  ctx.font = "600 26px Arial, sans-serif";
+  filas.forEach((fila, indice) => {
+    ctx.fillStyle = indice % 2 === 0 ? "#ffffff" : "#f3f7fb";
+    ctx.fillRect(MARGEN_X_EDIFICIO, y, anchoContenido, ALTURA_FILA_EDIFICIO);
+    ctx.fillStyle = "#17324d";
+    dibujarFilaTablaEdificio(ctx, columnas, y, ALTURA_FILA_EDIFICIO, [
+      fila.nombre,
+      formatearConsumo(fila.consumoEnergia),
+      formatearPesos(fila.costoEnergia),
+      formatearConsumo(fila.consumoAgua),
+      formatearPesos(fila.costoAgua),
+      formatearPesos(fila.totalAPagar),
+    ]);
+    y += ALTURA_FILA_EDIFICIO;
+  });
+
+  // Fila de totales
+  const sumar = (campo) => filas.reduce((acc, f) => acc + (Number(f[campo]) || 0), 0);
+  ctx.fillStyle = "#dfe9f3";
+  ctx.fillRect(MARGEN_X_EDIFICIO, y, anchoContenido, ALTURA_FILA_EDIFICIO);
+  ctx.fillStyle = "#1d4f7a";
+  ctx.font = "700 26px Arial, sans-serif";
+  dibujarFilaTablaEdificio(ctx, columnas, y, ALTURA_FILA_EDIFICIO, [
+    "TOTALES",
+    formatearConsumo(sumar("consumoEnergia")),
+    formatearPesos(sumar("costoEnergia")),
+    formatearConsumo(sumar("consumoAgua")),
+    formatearPesos(sumar("costoAgua")),
+    formatearPesos(sumar("totalAPagar")),
+  ]);
+  y += ALTURA_FILA_EDIFICIO;
+
+  ctx.strokeStyle = "#c7d4e2";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(MARGEN_X_EDIFICIO, inicioTabla, anchoContenido, alturaTabla);
+
+  y += ESPACIO_TRAS_TABLA;
+
+  // Nota: los servicios varios ya están incluidos en el total de cada apartamento.
+  ctx.fillStyle = "#5d6b7a";
+  ctx.font = "italic 400 23px Arial, sans-serif";
+  ctx.fillText(
+    `Cada total ya incluye su parte de servicios varios del mes: ${formatearPesos(totalServiciosVarios)} en total.`,
+    MARGEN_X_EDIFICIO,
+    y + 28,
+  );
+  y += ALTURA_NOTA_SERVICIOS;
+
+  // Caja de total general
+  rectanguloRedondeado(ctx, MARGEN_X_EDIFICIO, y, anchoContenido, ALTURA_CAJA_TOTAL_EDIFICIO, 28);
+  ctx.fillStyle = "#123b5d";
+  ctx.fill();
+  ctx.fillStyle = "#d9eaf7";
+  ctx.font = "700 31px Arial, sans-serif";
+  ctx.fillText("TOTAL A PAGAR", MARGEN_X_EDIFICIO + 50, y + 85);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 76px Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(formatearPesos(totalAPagar), MARGEN_X_EDIFICIO + anchoContenido - 50, y + 150);
+  ctx.textAlign = "left";
+
+  if (comparacion) {
+    const sube = comparacion.porcentaje > 0;
+    const baja = comparacion.porcentaje < 0;
+    ctx.fillStyle = sube ? "#ffc9b8" : baja ? "#bdf0cb" : "#d9eaf7";
+    ctx.font = "700 28px Arial, sans-serif";
+    const etiqueta =
+      comparacion.porcentaje === 0
+        ? "Sin cambios frente al mes anterior"
+        : `${sube ? "+" : "-"}${formatearPorcentaje(comparacion.porcentaje)} frente al mes anterior`;
+    ctx.textAlign = "right";
+    ctx.fillText(etiqueta, MARGEN_X_EDIFICIO + anchoContenido - 50, y + 190);
+    ctx.textAlign = "left";
+  }
+
+  y += ALTURA_CAJA_TOTAL_EDIFICIO + ESPACIO_TRAS_CAJA;
+
+  // Explicación del aumento/disminución
+  if (lineasExplicacion.length) {
+    ctx.fillStyle = "#17324d";
+    ctx.font = "500 26px Arial, sans-serif";
+    lineasExplicacion.forEach((linea, indice) => {
+      ctx.fillText(linea, MARGEN_X_EDIFICIO, y + ESPACIO_SUPERIOR_EXPLICACION + indice * ALTURA_LINEA_EXPLICACION);
+    });
+    y += alturaExplicacion;
+  }
+
+  // Pie
+  ctx.fillStyle = "#66798b";
+  ctx.font = "400 23px Arial, sans-serif";
+  ctx.fillText("Comprobante generado desde Lido Control by CDM", MARGEN_X_EDIFICIO, y + 30);
+
+  return canvas;
+}
+
+function nombreBaseArchivoEdificio(periodo) {
+  return `resumen-edificio-${periodo.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+/**
+ * Descarga el resumen de todo el edificio como JPG.
+ * @param {{ periodo: string, filas: Array, totalServiciosVarios: number, totalAPagar: number,
+ *   comparacion: object|null }} datos
+ */
+export async function descargarResumenEdificioComoImagen(datos) {
+  try {
+    const canvas = crearCanvasResumenEdificio(datos);
+    if (!canvas) return;
+    const archivo = await canvasABlob(canvas, "image/jpeg", 0.96);
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(archivo);
+    enlace.download = `${nombreBaseArchivoEdificio(datos.periodo)}.jpg`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(enlace.href);
+    mostrarExito("Imagen guardada en descargas.");
+  } catch (error) {
+    console.error("No se pudo generar la imagen del edificio:", error);
+    mostrarError("No se pudo generar la imagen del edificio.");
+  }
+}
+
+/**
+ * Copia el resumen de todo el edificio como imagen y abre WhatsApp en el chat del dueño
+ * (o sin chat elegido, si no hay número configurado en Apartamentos).
+ * @param {{ periodo: string, filas: Array, totalServiciosVarios: number, totalAPagar: number,
+ *   comparacion: object|null, telefonoDueno?: string|null }} datos
+ */
+export async function compartirResumenEdificioPorWhatsApp({ telefonoDueno, ...datos }) {
+  const canvas = crearCanvasResumenEdificio(datos);
+  if (!canvas) return;
+  const numero = normalizarCelularColombia(telefonoDueno);
+
+  let copiada = false;
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": canvasABlob(canvas, "image/png") }),
+    ]);
+    copiada = true;
+  } catch (error) {
+    console.error("No se pudo copiar la imagen:", error);
+    await descargarResumenEdificioComoImagen(datos);
+  }
+
+  try {
+    await abrirWhatsApp(numero);
+  } catch (error) {
+    console.error("No se pudo abrir WhatsApp:", error);
+    mostrarError("No se pudo abrir WhatsApp. Ábralo manualmente y adjunte la imagen.");
+    return;
+  }
+
+  const destino = numero ? "el chat del dueño del edificio" : "el contacto de su elección";
+  mostrarExito(
+    copiada
+      ? `Imagen copiada. En WhatsApp abra ${destino} y presione Ctrl+V para pegarla.`
+      : `WhatsApp abierto. La imagen se descargó: adjúntela en ${destino}.`,
+  );
+}

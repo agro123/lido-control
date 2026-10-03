@@ -8,7 +8,13 @@ import {
   calcularTarifaEnergia,
   calcularTarifaFija,
 } from "../helpers/calculos";
-import { descargarFilaComoImagen, compartirResumenPorWhatsApp } from "../helpers/resumenImagen";
+import {
+  compartirResumenEdificioPorWhatsApp,
+  compartirResumenPorWhatsApp,
+  construirResumenEdificio,
+  descargarFilaComoImagen,
+  descargarResumenEdificioComoImagen,
+} from "../helpers/resumenImagen";
 import { mostrarError, mostrarExito } from "../hooks/useToast";
 import {
   aNumeroONull,
@@ -163,7 +169,7 @@ function tieneDatosFaltantes(registro) {
   ));
 }
 
-export default function Historial({ registros, apartamentos, eliminarRegistro, guardarRegistro }) {
+export default function Historial({ registros, apartamentos, eliminarRegistro, guardarRegistro, telefonoDueno }) {
   const [filtroMes, setFiltroMes] = useState("");
   const [filtroAnio, setFiltroAnio] = useState("");
   const [filtroApto, setFiltroApto] = useState("");
@@ -270,12 +276,12 @@ export default function Historial({ registros, apartamentos, eliminarRegistro, g
       <div className="campo campo-accion"><span className="campo-etiqueta campo-etiqueta-invisible">Acciones</span><button type="button" className="btn btn-secundario" onClick={() => { setFiltroMes(""); setFiltroAnio(""); setFiltroApto(""); }}>Limpiar filtros</button></div>
     </div></div>
     <div className="tarjeta tarjeta-historial-grid">{registrosFiltrados.length === 0 ? <p className="historial-vacio">No hay registros para mostrar.</p> : <div className="historial-grid">{registrosFiltrados.map((registro) => <article key={registro.id} className="archivo-registro"><button type="button" className="archivo-registro-principal" onClick={() => abrirDetalle(registro)} aria-label={`Abrir ${registro.mes} ${registro.anio}, copia ${registro.copia}`}><span className="archivo-icono" aria-hidden="true">📁</span><span className="archivo-nombre">{registro.mes} {registro.anio} - Copia {String(registro.copia).padStart(2, "0")}</span><span className="archivo-meta">{(registro.apartamentos || []).length} apartamento(s)</span></button><button type="button" className="archivo-eliminar" onClick={() => setRegistroAEliminar(registro)} title="Eliminar este registro" aria-label={`Eliminar ${registro.mes} ${registro.anio}`}>🗑</button></article>)}</div>}</div>
-    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} registros={registros} apartamentos={apartamentos} guardando={guardandoDetalle} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} onExportar={() => exportarRegistro(registroDetalle)} />}
+    {registroDetalle && borrador && <ModalDetalle registro={registroDetalle} borrador={borrador} registros={registros} apartamentos={apartamentos} guardando={guardandoDetalle} telefonoDueno={telefonoDueno} onCerrar={cerrarDetalle} onActualizarRecibo={actualizarRecibo} onActualizarTarifa={actualizarTarifa} onActualizarLectura={actualizarLectura} onGuardar={guardarDatosFaltantes} onExportar={() => exportarRegistro(registroDetalle)} />}
     {registroAEliminar && <div className="modal-fondo" role="presentation"><section className="modal modal-confirmacion" role="dialog" aria-modal="true" aria-labelledby="eliminar-titulo"><h3 id="eliminar-titulo">¿Eliminar registro?</h3><p>Se eliminará únicamente <strong>{registroAEliminar.mes} {registroAEliminar.anio} - Copia {String(registroAEliminar.copia).padStart(2, "0")}</strong>, junto con los datos de sus apartamentos.</p><div className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={() => setRegistroAEliminar(null)}>Cancelar</button><button type="button" className="btn btn-peligro" onClick={confirmarEliminacion}>Eliminar registro</button></div></section></div>}
   </section>;
 }
 
-function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar, onExportar }) {
+function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, telefonoDueno, onCerrar, onActualizarRecibo, onActualizarTarifa, onActualizarLectura, onGuardar, onExportar }) {
   const totalAPagar = calcularTotalRegistro(borrador);
   const registroAnterior = useMemo(() => buscarRegistroAnterior(registro, registros), [registro, registros]);
   const totalAnterior = registroAnterior ? calcularTotalRegistro(registroAnterior) : null;
@@ -283,7 +289,37 @@ function ModalDetalle({ registro, borrador, registros, apartamentos, guardando, 
   const periodoAnterior = registroAnterior ? `${registroAnterior.mes} ${registroAnterior.anio}` : null;
   const puedeCompletar = tieneDatosFaltantes(registro);
 
-  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grupos">{GRUPOS_DATOS_RECIBO.map(([grupo, campos]) => <div className="bloque-tarifa" key={grupo}><h4>{grupo}</h4><div className="form-fila form-fila-bloque-tarifa">{campos.map(([tipo, campo]) => <CampoReciboDetalle key={`${tipo}-${campo}`} tipo={tipo} campo={campo} borrador={borrador} registro={registro} registroAnterior={registroAnterior} periodoAnterior={periodoAnterior} onActualizarRecibo={onActualizarRecibo} onActualizarTarifa={onActualizarTarifa} />)}</div></div>)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th><th>Imagen</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} telefono={apartamentos.find((item) => item.id === apto.apartamentoId)?.telefono} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} periodo={`${registro.mes} ${registro.anio}`} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={10}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onExportar}>Exportar a Excel (.xlsx)</button><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button>{puedeCompletar && <button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button>}</footer></section></div>;
+  /** Cálculos en vivo de cada apartamento (igual a los que dibuja cada FilaDetalle). */
+  const filasEdificio = useMemo(
+    () =>
+      (borrador.apartamentos || []).map((apto) => ({
+        nombre: apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`,
+        calculos: calcularFilaApartamento(
+          {
+            lecturaAnteriorEnergia: apto.energia?.lecturaAnterior,
+            lecturaActualEnergia: apto.energia?.lecturaActual,
+            lecturaAnteriorAgua: apto.agua?.lecturaAnterior,
+            lecturaActualAgua: apto.agua?.lecturaActual,
+          },
+          borrador,
+        ),
+      })),
+    [borrador, apartamentos],
+  );
+
+  /** Datos de todo el edificio para la imagen-resumen que se envía al dueño. */
+  function datosResumenEdificio() {
+    return construirResumenEdificio({
+      periodo: `${registro.mes} ${registro.anio}`,
+      filas: filasEdificio,
+      tarifaEnergia: borrador.tarifaEnergia,
+      tarifaAgua: borrador.tarifaAgua,
+      tarifaFija: borrador.tarifaFija,
+      registroAnterior,
+    });
+  }
+
+  return <div className="modal-fondo" role="presentation" onMouseDown={onCerrar}><section className="modal modal-registro" role="dialog" aria-modal="true" aria-labelledby="detalle-titulo" onMouseDown={(evento) => evento.stopPropagation()}><header className="modal-encabezado"><div><h3 id="detalle-titulo">{registro.mes} {registro.anio}</h3><p>Los datos guardados son de solo lectura. Los campos vacíos se pueden completar.</p></div><button type="button" className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar detalle">×</button></header><div className="modal-contenido"><h4>Datos del recibo</h4><div className="detalle-recibo-grupos">{GRUPOS_DATOS_RECIBO.map(([grupo, campos]) => <div className="bloque-tarifa" key={grupo}><h4>{grupo}</h4><div className="form-fila form-fila-bloque-tarifa">{campos.map(([tipo, campo]) => <CampoReciboDetalle key={`${tipo}-${campo}`} tipo={tipo} campo={campo} borrador={borrador} registro={registro} registroAnterior={registroAnterior} periodoAnterior={periodoAnterior} onActualizarRecibo={onActualizarRecibo} onActualizarTarifa={onActualizarTarifa} />)}</div></div>)}</div><section className="comparacion-total" aria-live="polite"><span>Variación total a pagar frente a {periodoAnterior || "el mes anterior"}</span>{variacionTotal === null ? <strong>Sin datos comparables del mes anterior.</strong> : <strong className={variacionTotal > 0 ? "variacion-sube" : variacionTotal < 0 ? "variacion-baja" : ""}>{textoVariacion(variacionTotal)} ({formatearPesos(totalAPagar)} vs. {formatearPesos(totalAnterior)})</strong>}</section><h4>Lecturas por apartamento</h4><div className="tabla-contenedor"><table className="tabla tabla-detalle"><thead><tr><th>Apartamento</th><th>Ant. energía</th><th>Act. energía</th><th>Cons. energía</th><th>Total energía</th><th>Ant. agua</th><th>Act. agua</th><th>Cons. agua</th><th>Total agua</th><th>Total a pagar</th><th>Imagen</th></tr></thead><tbody>{(borrador.apartamentos || []).map((apto) => <FilaDetalle key={apto.apartamentoId} apartamento={apto} nombre={apartamentos.find((item) => item.id === apto.apartamentoId)?.nombre || `Apartamento ${apto.apartamentoId}`} telefono={apartamentos.find((item) => item.id === apto.apartamentoId)?.telefono} original={(registro.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId) || {}} anterior={(registroAnterior?.apartamentos || []).find((item) => item.apartamentoId === apto.apartamentoId)} tarifas={borrador} tarifasAnteriores={registroAnterior} periodoAnterior={periodoAnterior} periodo={`${registro.mes} ${registro.anio}`} onChange={onActualizarLectura} />)}</tbody><tfoot><tr className="fila-totales"><td colSpan={9}>Suma total a pagar</td><td className="celda-total-pagado"><ComparacionHover etiqueta="Suma total a pagar" actual={totalAPagar} anterior={totalAnterior} periodoAnterior={periodoAnterior} formatear={formatearPesos}>{formatearPesos(totalAPagar)}</ComparacionHover></td><td className="celdas-compartir">{!puedeCompletar && <><button type="button" className="btn-exportar-fila" onClick={() => descargarResumenEdificioComoImagen(datosResumenEdificio())} title="Descargar resumen de todo el edificio en JPG" aria-label="Descargar resumen de todo el edificio en JPG">↓ JPG</button><button type="button" className="btn-exportar-fila btn-whatsapp" onClick={() => compartirResumenEdificioPorWhatsApp({ ...datosResumenEdificio(), telefonoDueno })} title={telefonoDueno ? "Enviar resumen del edificio al dueño por WhatsApp" : "Enviar resumen del edificio por WhatsApp (configure el número del dueño en Apartamentos)"} aria-label="Enviar resumen del edificio por WhatsApp">WP</button></>}</td></tr></tfoot></table></div></div><footer className="modal-acciones"><button type="button" className="btn btn-secundario" onClick={onExportar}>Exportar a Excel (.xlsx)</button><button type="button" className="btn btn-secundario" onClick={onCerrar}>Cerrar</button>{puedeCompletar && <button type="button" className="btn btn-primario" onClick={onGuardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar datos faltantes"}</button>}</footer></section></div>;
 }
 
 function CampoReciboDetalle({ tipo, campo, borrador, registro, registroAnterior, periodoAnterior, onActualizarRecibo, onActualizarTarifa }) {

@@ -10,12 +10,13 @@ const DATOS_VACIOS = {
     { id: 4, nombre: "Apto Edison" },
   ],
   registros: [],
+  telefonoDueno: null,
 };
 
 /**
  * Valida y normaliza la estructura leída de data.json.
  * @param {unknown} raw
- * @returns {{ apartamentos: Array, registros: Array }}
+ * @returns {{ apartamentos: Array, registros: Array, telefonoDueno: string|null }}
  */
 function normalizarDatos(raw) {
   if (!raw || typeof raw !== "object") {
@@ -41,6 +42,7 @@ function normalizarDatos(raw) {
   return {
     apartamentos: apartamentos.length > 0 ? apartamentos : [...DATOS_VACIOS.apartamentos],
     registros,
+    telefonoDueno: typeof raw.telefonoDueno === "string" && raw.telefonoDueno ? raw.telefonoDueno : null,
   };
 }
 
@@ -176,6 +178,18 @@ export function useData() {
   );
 
   /**
+   * Guarda el número de WhatsApp del dueño del edificio (o lo borra con null/"").
+   * @param {string|null} telefono
+   */
+  const guardarTelefonoDueno = useCallback(
+    async (telefono) => {
+      if (!datos) return false;
+      return guardarDatos({ ...datos, telefonoDueno: telefono || null });
+    },
+    [datos, guardarDatos],
+  );
+
+  /**
    * Busca un registro por mes y año.
    * @param {string} mes
    * @param {number} anio
@@ -197,6 +211,7 @@ export function useData() {
     guardarRegistro,
     eliminarRegistro,
     guardarApartamentos,
+    guardarTelefonoDueno,
     buscarRegistro,
   };
 }

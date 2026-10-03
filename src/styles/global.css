@@ -410,6 +410,17 @@ button {
   align-items: end;
 }
 
+.form-dueno {
+  grid-template-columns: 220px auto;
+  align-items: end;
+}
+
+.texto-ayuda {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--color-texto-secundario);
+}
+
 .campo {
   display: flex;
   flex-direction: column;
