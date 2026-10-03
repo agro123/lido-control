@@ -13,14 +13,140 @@ function rectanguloRedondeado(contexto, x, y, ancho, alto, radio) {
   contexto.closePath();
 }
 
+/** Compara dos números: 1 si subió, -1 si bajó, 0 si quedó igual o no son válidos. */
+function signoCambio(actual, anterior) {
+  if (!Number.isFinite(actual) || !Number.isFinite(anterior)) return 0;
+  if (actual > anterior) return 1;
+  if (actual < anterior) return -1;
+  return 0;
+}
+
+function formatearPorcentaje(porcentaje) {
+  const texto = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(
+    Math.abs(porcentaje),
+  );
+  return `${texto}%`;
+}
+
+function listarConY(items) {
+  if (items.length === 1) return items[0];
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+/** Variación porcentual simple; null si no hay base de comparación (anterior = 0 o inválido). */
+function variacionPorcentual(actual, anterior) {
+  if (!Number.isFinite(actual) || !Number.isFinite(anterior) || anterior === 0) return null;
+  return ((actual - anterior) / Math.abs(anterior)) * 100;
+}
+
+/** Separa un texto en líneas que no superen `anchoMaximo` con la fuente ya puesta en `contexto`. */
+function envolverTexto(contexto, texto, anchoMaximo) {
+  const palabras = texto.split(" ");
+  const lineas = [];
+  let actual = "";
+  palabras.forEach((palabra) => {
+    const prueba = actual ? `${actual} ${palabra}` : palabra;
+    if (actual && contexto.measureText(prueba).width > anchoMaximo) {
+      lineas.push(actual);
+      actual = palabra;
+    } else {
+      actual = prueba;
+    }
+  });
+  if (actual) lineas.push(actual);
+  return lineas;
+}
+
+/**
+ * Frase de un componente del total ("el costo de energía subió 12%"), o null si ese componente
+ * no se movió en la misma dirección que el total (para no listar algo que no explica el cambio).
+ */
+function fraseComponenteApartamento(sujeto, verboSube, verboBaja, actualValor, anteriorValor, direccion) {
+  if (signoCambio(actualValor, anteriorValor) !== direccion) return null;
+  const variacion = variacionPorcentual(actualValor, anteriorValor);
+  const verbo = direccion > 0 ? verboSube : verboBaja;
+  return variacion === null ? `${sujeto} ${verbo}` : `${sujeto} ${verbo} ${formatearPorcentaje(variacion)}`;
+}
+
+/** Convierte a número cada campo relevante (los inputs del borrador llegan como texto). */
+function normalizarDatosApartamento(datos) {
+  return {
+    consumoEnergia: Number(datos?.consumoEnergia) || 0,
+    tarifaEnergia: Number(datos?.tarifaEnergia) || 0,
+    consumoAgua: Number(datos?.consumoAgua) || 0,
+    tarifaAgua: Number(datos?.tarifaAgua) || 0,
+    tarifaFija: Number(datos?.tarifaFija) || 0,
+    totalAPagar: Number(datos?.totalAPagar) || 0,
+  };
+}
+
+/**
+ * Explica, para un apartamento, por qué subió o bajó su total frente al mes anterior.
+ * Considera el consumo y el precio por separado (el consumo depende del apartamento; el precio
+ * es el mismo para todo el edificio), más otros servicios. Solo menciona los factores que se
+ * movieron en la misma dirección que el total, cada uno con su propio porcentaje.
+ * @param {{ consumoEnergia: *, tarifaEnergia: *, consumoAgua: *, tarifaAgua: *, tarifaFija: *, totalAPagar: * }} actual
+ * @param {{ consumoEnergia: *, tarifaEnergia: *, consumoAgua: *, tarifaAgua: *, tarifaFija: *, totalAPagar: * }|null} anterior
+ * @returns {{ porcentaje: number, texto: string }|null}
+ */
+export function construirComparacionApartamento(actual, anterior) {
+  if (!anterior || !Number.isFinite(Number(anterior.totalAPagar)) || !Number(anterior.totalAPagar)) {
+    return null;
+  }
+
+  const datosActuales = normalizarDatosApartamento(actual);
+  const datosAnteriores = normalizarDatosApartamento(anterior);
+
+  const direccion = signoCambio(datosActuales.totalAPagar, datosAnteriores.totalAPagar);
+  if (direccion === 0) {
+    return { porcentaje: 0, texto: "El total de este apartamento se mantuvo igual al mes anterior." };
+  }
+
+  const porcentajeTotal = variacionPorcentual(datosActuales.totalAPagar, datosAnteriores.totalAPagar) ?? 0;
+
+  const razones = [
+    fraseComponenteApartamento("tu consumo de energía", "aumentó", "disminuyó", datosActuales.consumoEnergia, datosAnteriores.consumoEnergia, direccion),
+    fraseComponenteApartamento("el precio de la energía", "subió", "bajó", datosActuales.tarifaEnergia, datosAnteriores.tarifaEnergia, direccion),
+    fraseComponenteApartamento("tu consumo de agua", "aumentó", "disminuyó", datosActuales.consumoAgua, datosAnteriores.consumoAgua, direccion),
+    fraseComponenteApartamento("el precio del agua", "subió", "bajó", datosActuales.tarifaAgua, datosAnteriores.tarifaAgua, direccion),
+    fraseComponenteApartamento("otros servicios", "subieron", "bajaron", datosActuales.tarifaFija, datosAnteriores.tarifaFija, direccion),
+  ].filter(Boolean);
+
+  const frase = direccion > 0 ? "un aumento" : "una disminución";
+  const porcentajeTexto = formatearPorcentaje(porcentajeTotal);
+
+  const texto =
+    razones.length === 0
+      ? `Hubo ${frase} del ${porcentajeTexto} en el total frente al mes anterior.`
+      : `Hubo ${frase} del ${porcentajeTexto} en el total porque ${listarConY(razones)}.`;
+
+  return { porcentaje: porcentajeTotal, texto };
+}
+
 /**
  * Dibuja el resumen de pago de un apartamento en un canvas.
+ * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number,
+ *   comparacion?: { porcentaje: number, texto: string } | null }} datos
  * @returns {HTMLCanvasElement|null}
  */
-function crearCanvasResumen({ periodo, nombre, apartamento, calculos, tarifaFija }) {
+function crearCanvasResumen({ periodo, nombre, apartamento, calculos, tarifaFija, comparacion }) {
+  // Altura base (sin texto de comparación) y espacio que ocupa la caja de total, para no
+  // mover ningún otro elemento cuando no hay mes anterior con que comparar.
+  const ALTURA_BASE = 1240;
+  const FIN_CAJA_TOTAL = 1095;
+  const ESPACIO_CAJA_A_PIE_SIN_COMPARACION = 75;
+
+  const medidor = document.createElement("canvas").getContext("2d");
+  medidor.font = "500 26px Arial, sans-serif";
+  const lineasComparacion = comparacion ? envolverTexto(medidor, comparacion.texto, 1610) : [];
+  const alturaComparacion = lineasComparacion.length ? 35 + lineasComparacion.length * 34 + 15 : 0;
+  const finPie = lineasComparacion.length
+    ? FIN_CAJA_TOTAL + alturaComparacion
+    : FIN_CAJA_TOTAL + ESPACIO_CAJA_A_PIE_SIN_COMPARACION;
+
   const canvas = document.createElement("canvas");
   canvas.width = 1800;
-  canvas.height = 1240;
+  canvas.height = Math.max(ALTURA_BASE, finPie + 70);
   const contexto = canvas.getContext("2d");
   if (!contexto) return null;
 
@@ -89,9 +215,36 @@ function crearCanvasResumen({ periodo, nombre, apartamento, calculos, tarifaFija
     contexto.fillText(`+ Otros servicios ${formatearPesos(tarifaFija)}`, 150, 1048);
   }
 
+  if (comparacion) {
+    const sube = comparacion.porcentaje > 0;
+    const baja = comparacion.porcentaje < 0;
+    contexto.fillStyle = sube ? "#ffc9b8" : baja ? "#bdf0cb" : "#d9eaf7";
+    contexto.font = "600 24px Arial, sans-serif";
+    const etiqueta =
+      comparacion.porcentaje === 0
+        ? "Sin cambios frente al mes anterior"
+        : `${sube ? "+" : "-"}${formatearPorcentaje(comparacion.porcentaje)} frente al mes anterior`;
+    contexto.textAlign = "right";
+    contexto.fillText(etiqueta, 1650, 1048);
+    contexto.textAlign = "left";
+  }
+
+  let y = FIN_CAJA_TOTAL;
+
+  if (lineasComparacion.length) {
+    contexto.fillStyle = "#17324d";
+    contexto.font = "500 26px Arial, sans-serif";
+    lineasComparacion.forEach((linea, indice) => {
+      contexto.fillText(linea, 95, y + 35 + indice * 34);
+    });
+    y += alturaComparacion;
+  } else {
+    y += ESPACIO_CAJA_A_PIE_SIN_COMPARACION - 23; // separación original hasta el texto del pie
+  }
+
   contexto.fillStyle = "#66798b";
   contexto.font = "400 23px Arial, sans-serif";
-  contexto.fillText("Comprobante generado desde Lido Control by CDM", 95, 1170);
+  contexto.fillText("Comprobante generado desde Lido Control by CDM", 95, y + 23);
   return canvas;
 }
 
@@ -109,7 +262,8 @@ function canvasABlob(canvas, tipo, calidad) {
 
 /**
  * Descarga el resumen de un apartamento como JPG.
- * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number }} datos
+ * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number,
+ *   comparacion?: { porcentaje: number, texto: string } | null }} datos
  */
 export async function descargarFilaComoImagen(datos) {
   try {
@@ -159,7 +313,8 @@ async function abrirWhatsApp(telefono) {
  * Copia el resumen como imagen al portapapeles y abre WhatsApp para pegarla (Ctrl+V).
  * WhatsApp no permite adjuntar archivos desde un enlace, por eso el usuario pega la imagen.
  * Si no se puede copiar, descarga la imagen para adjuntarla a mano.
- * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number, telefono?: string|null }} datos
+ * @param {{ periodo: string, nombre: string, apartamento: object, calculos: object, tarifaFija: number, telefono?: string|null,
+ *   comparacion?: { porcentaje: number, texto: string } | null }} datos
  */
 export async function compartirResumenPorWhatsApp({ telefono, ...datos }) {
   const canvas = crearCanvasResumen(datos);
@@ -195,26 +350,8 @@ export async function compartirResumenPorWhatsApp({ telefono, ...datos }) {
 }
 
 /* ---------- Resumen de todo el edificio (para el dueño) ---------- */
-
-/** Compara dos números: 1 si subió, -1 si bajó, 0 si quedó igual o no son válidos. */
-function signoCambio(actual, anterior) {
-  if (!Number.isFinite(actual) || !Number.isFinite(anterior)) return 0;
-  if (actual > anterior) return 1;
-  if (actual < anterior) return -1;
-  return 0;
-}
-
-function formatearPorcentaje(porcentaje) {
-  const texto = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(
-    Math.abs(porcentaje),
-  );
-  return `${texto}%`;
-}
-
-function listarConY(items) {
-  if (items.length === 1) return items[0];
-  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
-}
+/* signoCambio, formatearPorcentaje, listarConY y envolverTexto están definidos arriba,
+   junto a construirComparacionApartamento, y se reutilizan aquí. */
 
 /**
  * Suma las cifras de todos los apartamentos para un conjunto de filas ya calculadas.
@@ -320,24 +457,6 @@ export function construirResumenEdificio({ periodo, filas, tarifaEnergia, tarifa
     totalAPagar: actual.totalAPagar,
     comparacion: anterior ? construirComparacionEdificio(actual, anterior) : null,
   };
-}
-
-/** Separa un texto en líneas que no superen `anchoMaximo` con la fuente ya puesta en `contexto`. */
-function envolverTexto(contexto, texto, anchoMaximo) {
-  const palabras = texto.split(" ");
-  const lineas = [];
-  let actual = "";
-  palabras.forEach((palabra) => {
-    const prueba = actual ? `${actual} ${palabra}` : palabra;
-    if (actual && contexto.measureText(prueba).width > anchoMaximo) {
-      lineas.push(actual);
-      actual = palabra;
-    } else {
-      actual = prueba;
-    }
-  });
-  if (actual) lineas.push(actual);
-  return lineas;
 }
 
 const ANCHO_CANVAS_EDIFICIO = 1800;

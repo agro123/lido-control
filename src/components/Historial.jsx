@@ -11,6 +11,7 @@ import {
 import {
   compartirResumenEdificioPorWhatsApp,
   compartirResumenPorWhatsApp,
+  construirComparacionApartamento,
   construirResumenEdificio,
   descargarFilaComoImagen,
   descargarResumenEdificioComoImagen,
@@ -347,7 +348,14 @@ function FilaDetalle({ apartamento, nombre, telefono, original, anterior, tarifa
   };
   const calculado = (etiqueta, actual, previo, moneda = false) => <ComparacionHover etiqueta={etiqueta} actual={actual} anterior={previo} periodoAnterior={periodoAnterior} formatear={moneda ? formatearPesos : formatearConsumo}>{moneda ? formatearPesos(actual) : formatearConsumo(actual)}</ComparacionHover>;
   const tarifaFija = tarifas?.tarifaFija ?? 0;
-  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td className="celdas-compartir"><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen({ periodo, nombre, apartamento, calculos, tarifaFija })} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button><button type="button" className="btn-exportar-fila btn-whatsapp" onClick={() => compartirResumenPorWhatsApp({ periodo, nombre, apartamento, calculos, tarifaFija, telefono })} title={telefono ? `Enviar resumen a ${nombre} por WhatsApp` : `Enviar resumen por WhatsApp (${nombre} no tiene número; elija el contacto)`} aria-label={`Enviar resumen de ${nombre} por WhatsApp`}>WP</button></td></tr>;
+  const comparacion = construirComparacionApartamento(
+    { consumoEnergia: calculos.consumoEnergia, tarifaEnergia: tarifas?.tarifaEnergia, consumoAgua: calculos.consumoAgua, tarifaAgua: tarifas?.tarifaAgua, tarifaFija, totalAPagar: calculos.totalAPagar },
+    anterior
+      ? { consumoEnergia: calculosAnteriores.consumoEnergia, tarifaEnergia: tarifasAnteriores?.tarifaEnergia, consumoAgua: calculosAnteriores.consumoAgua, tarifaAgua: tarifasAnteriores?.tarifaAgua, tarifaFija: tarifasAnteriores?.tarifaFija, totalAPagar: calculosAnteriores.totalAPagar }
+      : null,
+  );
+  const datosImagen = { periodo, nombre, apartamento, calculos, tarifaFija, comparacion };
+  return <tr><td className="celda-nombre">{nombre}</td><td>{lectura("energia", "lecturaAnterior", "Lectura anterior de energía", false)}</td><td>{lectura("energia", "lecturaActual", "Lectura actual de energía")}</td><td>{calculado("Consumo de energía", calculos.consumoEnergia, calculosAnteriores.consumoEnergia)}</td><td>{calculado("Total de energía", calculos.costoEnergia, calculosAnteriores.costoEnergia, true)}</td><td>{lectura("agua", "lecturaAnterior", "Lectura anterior de agua", false)}</td><td>{lectura("agua", "lecturaActual", "Lectura actual de agua")}</td><td>{calculado("Consumo de agua", calculos.consumoAgua, calculosAnteriores.consumoAgua)}</td><td>{calculado("Total de agua", calculos.costoAgua, calculosAnteriores.costoAgua, true)}</td><td className="celda-total-pagado">{calculado("Total a pagar", calculos.totalAPagar, calculosAnteriores.totalAPagar, true)}</td><td className="celdas-compartir"><button type="button" className="btn-exportar-fila" onClick={() => descargarFilaComoImagen(datosImagen)} title={`Descargar resumen de ${nombre} en JPG`} aria-label={`Descargar resumen de ${nombre} en JPG`}>↓ JPG</button><button type="button" className="btn-exportar-fila btn-whatsapp" onClick={() => compartirResumenPorWhatsApp({ ...datosImagen, telefono })} title={telefono ? `Enviar resumen a ${nombre} por WhatsApp` : `Enviar resumen por WhatsApp (${nombre} no tiene número; elija el contacto)`} aria-label={`Enviar resumen de ${nombre} por WhatsApp`}>WP</button></td></tr>;
 }
 
 function ComparacionHover({ etiqueta, actual, anterior, periodoAnterior, formatear, children }) {

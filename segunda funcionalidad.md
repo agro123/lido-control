@@ -1,0 +1,5 @@
+En Registro mensual y en el detalle cada mes de historial:
+ Agregar un boton de WP/jpg en la columna "Enviar" fila de "Totales" o "Suma total a pagar"  
+ Este generara una imagen con los datos de consumo de agua y energia de cada apartamento, el costo de cada servico incluido, servicios varios, el total y porcentaje de aumento/disminuicion respecto al mes pasado (si existen).
+ Incluido un pequeno texto al final de la imagen que diga indique porque hubo un aumento o disminuicion frente a los datos del mes pasado (solo si existen) y el porcentaje ejemplo: "Hubo un aumento del costo porque el consumo de energia aumento" "Hubo un aumento en el costo porque el consumo de energia aumento, agua aumento y precio de energia aumento". genera todos los casos teniendo en cuenta cada variable energia, agua y servicios basicos. 
+ Esta imagen sera enviada al dueno del edificio por lo tanto debe poder configurarse su numero de telefono en la seccion "Apartamentos"

@@ -11,6 +11,7 @@ import { extraerDatosRecibo, obtenerUsoRecibo } from "../helpers/reciboPdf";
 import {
   compartirResumenEdificioPorWhatsApp,
   compartirResumenPorWhatsApp,
+  construirComparacionApartamento,
   construirResumenEdificio,
   descargarFilaComoImagen,
   descargarResumenEdificioComoImagen,
@@ -394,6 +395,10 @@ export default function RegistroMensual({
 
   /** Datos de una fila en el formato que usa la imagen de resumen. */
   function datosResumen(fila) {
+    const aptoAnterior = registroAnteriorEdificio?.apartamentos?.find(
+      (a) => a.apartamentoId === fila.apartamentoId,
+    );
+
     return {
       periodo: `${mes} ${anio}`,
       nombre: fila.nombre,
@@ -409,6 +414,26 @@ export default function RegistroMensual({
       },
       calculos: fila.calculos,
       tarifaFija: aNumeroONull(tarifaFija) ?? 0,
+      comparacion: construirComparacionApartamento(
+        {
+          consumoEnergia: fila.calculos.consumoEnergia,
+          tarifaEnergia,
+          consumoAgua: fila.calculos.consumoAgua,
+          tarifaAgua,
+          tarifaFija,
+          totalAPagar: fila.calculos.totalAPagar,
+        },
+        aptoAnterior
+          ? {
+              consumoEnergia: aptoAnterior.energia?.consumo,
+              tarifaEnergia: registroAnteriorEdificio?.tarifaEnergia,
+              consumoAgua: aptoAnterior.agua?.consumo,
+              tarifaAgua: registroAnteriorEdificio?.tarifaAgua,
+              tarifaFija: registroAnteriorEdificio?.tarifaFija,
+              totalAPagar: aptoAnterior.totalAPagar,
+            }
+          : null,
+      ),
     };
   }
 
