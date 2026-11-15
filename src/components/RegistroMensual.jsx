@@ -314,8 +314,8 @@ export default function RegistroMensual({
 
   /**
    * Carga inicial al montar. Solo muestra lecturas anteriores en las columnas
-   * "Ant."; los demás campos empiezan vacíos. Al cambiar mes/año NO se recargan los valores:
-   * se conservan para que el usuario pueda corregir el periodo antes de guardar.
+   * "Ant."; los demás campos empiezan vacíos. Al cambiar mes/año (ver `aplicarMesAnterior`)
+   * solo se actualizan las lecturas "Ant." si existe el registro del mes anterior.
    * Solo se sincronizan filas si cambia la lista de apartamentos.
    */
   useEffect(() => {
@@ -346,14 +346,54 @@ export default function RegistroMensual({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mes/año no deben reiniciar el formulario
   }, [apartamentos, buscarRegistro]);
 
-  /** Cambia el mes sin borrar tarifas ni lecturas ya digitadas. */
-  function cambiarMes(nuevoMes) {
-    setMes(nuevoMes);
+  /**
+   * Al cambiar el periodo, busca el registro del mes anterior y, si existe, pone sus
+   * lecturas actuales como lecturas "Ant." del nuevo periodo. Si no existe, el formulario
+   * se deja tal cual (vacío o con lo que ya se haya digitado). Tarifas, recibo y
+   * lecturas actuales nunca se tocan.
+   * @param {string} nuevoMes
+   * @param {number} nuevoAnio
+   */
+  function aplicarMesAnterior(nuevoMes, nuevoAnio) {
+    const anteriorRef = obtenerMesAnioAnterior(nuevoMes, nuevoAnio);
+    const registroAnterior = anteriorRef
+      ? buscarRegistro(anteriorRef.mes, anteriorRef.anio)
+      : null;
+    if (!registroAnterior) {
+      setOrigenMesAnterior(null);
+      return;
+    }
+
+    const mapaAnterior = new Map(
+      (registroAnterior.apartamentos || []).map((a) => [a.apartamentoId, a]),
+    );
+    setFilas((previas) =>
+      previas.map((fila) => {
+        const datos = mapaAnterior.get(fila.apartamentoId);
+        if (!datos) return fila;
+        const desdeAnterior = crearFilaConMesAnterior(fila.apartamentoId, datos);
+        return {
+          ...fila,
+          lecturaAnteriorEnergia:
+            desdeAnterior.lecturaAnteriorEnergia || fila.lecturaAnteriorEnergia,
+          lecturaAnteriorAgua: desdeAnterior.lecturaAnteriorAgua || fila.lecturaAnteriorAgua,
+        };
+      }),
+    );
+    setOrigenMesAnterior(`${anteriorRef.mes} ${anteriorRef.anio}`);
   }
 
-  /** Cambia el año sin borrar tarifas ni lecturas ya digitadas. */
+  /** Cambia el mes y trae las lecturas del mes anterior si existen. */
+  function cambiarMes(nuevoMes) {
+    setMes(nuevoMes);
+    aplicarMesAnterior(nuevoMes, anio);
+  }
+
+  /** Cambia el año y trae las lecturas del mes anterior si existen. */
   function cambiarAnio(nuevoAnio) {
-    setAnio(Number(nuevoAnio));
+    const valor = Number(nuevoAnio);
+    setAnio(valor);
+    aplicarMesAnterior(mes, valor);
   }
 
   const tarifas = useMemo(

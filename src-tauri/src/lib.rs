@@ -62,7 +62,7 @@ async fn write_data(app: tauri::AppHandle, content: String) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![read_data, write_data, recibo::extraer_datos_recibo, recibo::estado_uso_recibo])
+        .invoke_handler(tauri::generate_handler![read_data, write_data, recibo::extraer_datos_recibo, recibo::estado_uso_recibo, recibo::guardar_clave_gemini, recibo::estado_clave_gemini])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

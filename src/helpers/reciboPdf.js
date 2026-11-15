@@ -39,3 +39,20 @@ export async function extraerDatosRecibo(archivo) {
 export function obtenerUsoRecibo() {
   return invoke("estado_uso_recibo");
 }
+
+/**
+ * Guarda (o reemplaza) la clave de Gemini. Rust la guarda y nunca la devuelve.
+ * @param {string} clave
+ * @returns {Promise<void>}
+ */
+export function guardarClaveGemini(clave) {
+  return invoke("guardar_clave_gemini", { clave });
+}
+
+/**
+ * Indica si ya hay una clave de Gemini configurada (sin revelarla).
+ * @returns {Promise<boolean>}
+ */
+export function hayClaveGemini() {
+  return invoke("estado_clave_gemini");
+}

@@ -6,6 +6,8 @@
 //!
 //! Las variables se leen del entorno del proceso y, si no están, de un archivo `.env`
 //! (en desarrollo: en la raíz del proyecto; instalada: en el directorio de datos de la app).
+//! La clave guardada desde la pantalla de configuración (`gemini_key.txt` en el directorio
+//! de datos) tiene prioridad sobre todo lo anterior. La clave nunca se devuelve al frontend.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -18,6 +20,7 @@ const MODELO_POR_DEFECTO: &str = "gemini-2.5-flash-lite";
 /// Máximo de lecturas de PDF por mes calendario (controla el gasto de la API).
 const MAX_USOS_MENSUALES: u32 = 3;
 const ARCHIVO_USO: &str = "uso_pdf.json";
+const ARCHIVO_CLAVE: &str = "gemini_key.txt";
 
 const INSTRUCCIONES: &str = "\
 Eres un extractor de datos de recibos de servicios públicos colombianos (energía, acueducto y \
@@ -121,13 +124,58 @@ fn cargar_env(app: &tauri::AppHandle) {
     let _ = dotenvy::dotenv();
 }
 
-fn leer_config(app: &tauri::AppHandle) -> Result<(String, String), String> {
-    cargar_env(app);
+fn ruta_clave(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("No se pudo obtener el directorio de datos: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear el directorio de datos: {e}"))?;
+    Ok(dir.join(ARCHIVO_CLAVE))
+}
 
-    let clave = std::env::var("GEMINI_API_KEY")
+/// Clave guardada desde la configuración de la app, si existe.
+fn leer_clave_guardada(app: &tauri::AppHandle) -> Option<String> {
+    let ruta = ruta_clave(app).ok()?;
+    fs::read_to_string(ruta)
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
+}
+
+fn leer_clave(app: &tauri::AppHandle) -> Option<String> {
+    leer_clave_guardada(app).or_else(|| {
+        cargar_env(app);
+        std::env::var("GEMINI_API_KEY")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    })
+}
+
+/// Guarda (o reemplaza) la clave de Gemini. No hay forma de leerla de vuelta desde la UI.
+#[tauri::command]
+pub async fn guardar_clave_gemini(app: tauri::AppHandle, clave: String) -> Result<(), String> {
+    let clave = clave.trim();
+    if clave.is_empty() {
+        return Err("La clave está vacía.".into());
+    }
+    if clave.chars().any(char::is_whitespace) {
+        return Err("La clave no debe tener espacios.".into());
+    }
+    let ruta = ruta_clave(&app)?;
+    fs::write(&ruta, clave).map_err(|e| format!("No se pudo guardar la clave: {e}"))
+}
+
+/// Indica si hay una clave de Gemini configurada (sin revelarla).
+#[tauri::command]
+pub async fn estado_clave_gemini(app: tauri::AppHandle) -> Result<bool, String> {
+    Ok(leer_clave(&app).is_some())
+}
+
+fn leer_config(app: &tauri::AppHandle) -> Result<(String, String), String> {
+    cargar_env(app);
+
+    let clave = leer_clave(app)
         .ok_or_else(|| {
             let ubicacion: PathBuf = app
                 .path()
@@ -135,8 +183,8 @@ fn leer_config(app: &tauri::AppHandle) -> Result<(String, String), String> {
                 .map(|d| d.join(".env"))
                 .unwrap_or_else(|_| PathBuf::from(".env"));
             format!(
-                "Falta la variable GEMINI_API_KEY. Defínala en un archivo .env (ver .env.example) \
-                 en la raíz del proyecto o en {}.",
+                "Falta la clave de Gemini. Ingrésela en Configuración, o defina GEMINI_API_KEY \
+                 en un archivo .env (ver .env.example) en la raíz del proyecto o en {}.",
                 ubicacion.display()
             )
         })?;

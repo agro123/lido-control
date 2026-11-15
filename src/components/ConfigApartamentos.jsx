@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { normalizarInputNumerico } from "../helpers/formato";
 import { mostrarError, mostrarExito } from "../hooks/useToast";
+import { guardarClaveGemini, hayClaveGemini } from "../helpers/reciboPdf";
 
 /** Un celular colombiano: 10 dígitos que empiezan por 3. Vacío es válido (WhatsApp sin número). */
 function celularValido(texto) {
@@ -27,6 +28,38 @@ export default function ConfigApartamentos({
   const [errorDueno, setErrorDueno] = useState("");
   const [guardandoDueno, setGuardandoDueno] = useState(false);
   const [error, setError] = useState("");
+  const [claveInput, setClaveInput] = useState("");
+  const [claveConfigurada, setClaveConfigurada] = useState(null);
+  const [errorClave, setErrorClave] = useState("");
+  const [guardandoClave, setGuardandoClave] = useState(false);
+
+  useEffect(() => {
+    hayClaveGemini().then(setClaveConfigurada).catch(() => setClaveConfigurada(null));
+  }, []);
+
+  /** Guarda la clave de Gemini. Después de guardarla no se vuelve a mostrar. */
+  async function manejarGuardarClave(evento) {
+    evento.preventDefault();
+    setErrorClave("");
+
+    const clave = claveInput.trim();
+    if (!clave) {
+      setErrorClave("Pegue la clave de Gemini antes de guardar.");
+      return;
+    }
+
+    setGuardandoClave(true);
+    try {
+      await guardarClaveGemini(clave);
+      setClaveInput("");
+      setClaveConfigurada(true);
+      mostrarExito("Clave de Gemini guardada.");
+    } catch (err) {
+      mostrarError(`No se pudo guardar la clave: ${typeof err === "string" ? err : err?.message || "error desconocido"}`);
+    } finally {
+      setGuardandoClave(false);
+    }
+  }
 
   /** Guarda el número de WhatsApp del dueño del edificio. */
   async function manejarGuardarDueno(evento) {
@@ -173,6 +206,41 @@ export default function ConfigApartamentos({
         {errorDueno && (
           <p className="campo-error" role="alert">
             {errorDueno}
+          </p>
+        )}
+      </div>
+
+      <div className="tarjeta">
+        <h3 className="seccion-titulo">Lectura de recibos (Gemini)</h3>
+        <p className="texto-ayuda">
+          {claveConfigurada
+            ? "Ya hay una clave guardada. Por seguridad no se muestra. Para cambiarla, pegue una nueva."
+            : "Pegue la clave de Gemini para poder leer los recibos en PDF."}
+        </p>
+        <form className="form-fila form-dueno" onSubmit={manejarGuardarClave}>
+          <label className="campo">
+            <span className="campo-etiqueta">
+              {claveConfigurada ? "Nueva clave de Gemini" : "Clave de Gemini"}
+            </span>
+            <input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={claveInput}
+              onChange={(e) => setClaveInput(e.target.value)}
+              placeholder={claveConfigurada ? "•••••••• (guardada)" : "Pegue aquí la clave"}
+            />
+          </label>
+          <div className="campo campo-accion">
+            <span className="campo-etiqueta campo-etiqueta-invisible">Acción</span>
+            <button type="submit" className="btn btn-primario" disabled={guardandoClave}>
+              {guardandoClave ? "Guardando…" : "Guardar clave"}
+            </button>
+          </div>
+        </form>
+        {errorClave && (
+          <p className="campo-error" role="alert">
+            {errorClave}
           </p>
         )}
       </div>
