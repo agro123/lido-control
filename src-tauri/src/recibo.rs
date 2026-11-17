@@ -18,7 +18,7 @@ use tauri::Manager;
 const MODELO_POR_DEFECTO: &str = "gemini-2.5-flash-lite";
 
 /// Máximo de lecturas de PDF por mes calendario (controla el gasto de la API).
-const MAX_USOS_MENSUALES: u32 = 3;
+const MAX_USOS_MENSUALES: u32 = 5;
 const ARCHIVO_USO: &str = "uso_pdf.json";
 const ARCHIVO_CLAVE: &str = "gemini_key.txt";
 
